@@ -16,6 +16,7 @@ const { KeyStore, keyStorePath, isValidKeyName, ORIGIN_MODEL, ORIGIN_OPERATOR, S
 const policy = await import(pathToFileURL(join(ROOT, 'lib/policy.js')).href);
 const { ConfirmationLedger } = await import(pathToFileURL(join(ROOT, 'lib/tools.js')).href);
 const usageModuleUrl = pathToFileURL(join(ROOT, 'lib/usage.js')).href;
+const indexModuleUrl = pathToFileURL(join(ROOT, 'lib/index.js')).href;
 
 const { checkModelAccess, normalisePolicy, normaliseScopePattern, scopeMatcher, isAccessMode, ACCESS_MODES, DEFAULT_ACCESS_MODE } = policy;
 
@@ -1019,6 +1020,65 @@ describe('[21] usage log: intent tool and gateway wiring');
     });
 
     rmSync(dir, { recursive: true, force: true });
+}
+// ── The Typert remote contract: signatures must be bare identifiers ────────
+describe('[22] every remote method has a Typert-legal signature');
+{
+    // Typert rejects a remote method whose parameters carry a DEFAULT, a
+    // DESTRUCTURE or a REST, per method, at registration time:
+    //
+    //   gateway/signature-invalid: keyPanel/usage: SRC method "usage" must use
+    //   unique identifier parameters without destructuring, defaults, or rest
+    //
+    // The failure mode is nasty because it is per-method and silent at the
+    // plugin level: `usage(limit = 200)` threw away ONLY that remote. The panel
+    // still mounted, every other RPC still answered, and the card showed its
+    // empty state — so "no records yet" looked like a working feature with no
+    // data rather than a broken one. Nothing in the suite noticed.
+    //
+    // Read the methods straight off the prototype rather than off a list here,
+    // because the list in lib/index.js (markRemoteMethods) is exactly the thing
+    // that has to stay in sync — asserting it against itself would be circular.
+    const { KeyPanelGateway } = await import(indexModuleUrl);
+    // The marker descriptor markRemoteMethods() writes; reading it here checks
+    // the real registration rather than a list restated in the test.
+    const descriptor = KeyPanelGateway.prototype['@deepseek-ai/dsh-typert-protocol/remote-methods'];
+    const remote = new Set((descriptor?.methods ?? []).map(m => m.method));
+
+    it('the gateway exposes remotes to check', () => remote.size >= 15);
+
+    const source = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8');
+    const offenders = [];
+    for (const name of remote) {
+        // Match `name(args) {` at class-method indentation, capturing the
+        // raw parameter text.
+        const re = new RegExp('^ {4}' + name + '[(]([^)]*)[)] *[{]', 'm');
+        const m = source.match(re);
+        if (m === null) { offenders.push(`${name}: signature not found`); continue; }
+        const params = m[1].trim();
+        if (params === '') continue;
+        for (const p of params.split(',')) {
+            const t = p.trim();
+            if (t === '') { offenders.push(`${name}: empty parameter`); continue; }
+            if (t.includes('=')) { offenders.push(`${name}: ${t} has a default`); continue; }
+            if (t.includes('{') || t.includes('[')) { offenders.push(`${name}: ${t} destructures`); continue; }
+            if (t.startsWith('...')) { offenders.push(`${name}: ${t} is a rest param`); continue; }
+            if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(t)) offenders.push(`${name}: ${t} is not a bare identifier`);
+        }
+    }
+    it('no remote parameter has a default, destructure or rest', () => {
+        eq(offenders, []);
+        return true;
+    });
+
+    // The regression itself, pinned. If someone reintroduces the default this
+    // reports the exact method instead of an empty panel.
+    it('usage() takes no parameters', () => {
+        const m = source.match(/^ {4}usage[(]([^)]*)[)] *[{]/m);
+        if (m === null) throw new Error('usage() not found on the gateway');
+        eq(m[1], '');
+        return true;
+    });
 }
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

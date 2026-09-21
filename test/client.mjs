@@ -215,7 +215,7 @@ await api.addAccount('CF', 'WORK', 'Work');
 await api.setAccountLabel('CF', 'WORK', 'Work acct');
 await api.removeAccount('CF', 'WORK', true);
 await api.credentialNames('CF', 'WORK');
-await api.usage(50);
+await api.usage();
 const argsFor = endpoint => calls.find(c => c.endpoint === `keyPanel/${endpoint}`)?.payload.args;
 it('addPlatform() sends {identifier, label}',
     () => eq(argsFor('addPlatform'), { identifier: 'CF', label: 'Cloudflare' }));
@@ -231,7 +231,12 @@ it('removeAccount() sends {platform, identifier, force}',
     () => eq(argsFor('removeAccount'), { platform: 'CF', identifier: 'WORK', force: true }));
 it('credentialNames() sends {platform, account}',
     () => eq(argsFor('credentialNames'), { platform: 'CF', account: 'WORK' }));
-it('usage() sends {limit}', () => eq(argsFor('usage'), { limit: 50 }));
+// Takes no arguments because the host remote does not: Typert rejects a remote
+// whose parameters carry a default, a destructure or a rest, and the original
+// `usage(limit = 200)` failed registration exactly that way. The panel rendered
+// fine and only the card was empty, which is why this is asserted here rather
+// than trusted to the host ignoring an extra argument.
+it('usage() sends no arguments', () => eq(argsFor('usage'), {}));
 
 // ── Errors from the host must surface, not be swallowed ─────────────────────
 describe('[6] RPC error propagation');
