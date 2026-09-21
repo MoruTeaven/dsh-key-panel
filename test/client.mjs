@@ -525,5 +525,77 @@ describe('[10] platform-group rendering');
     reactStub.useState = prevUseState;
 }
 
+
+describe('[12] every primitive the bundle destructures actually exists');
+// The bundle pulls ~15 names out of @deepseek-ai/dsh-client-ui-primitives by
+// destructuring. A name that does not exist is `undefined` — no import error,
+// no lint warning — and the failure only appears when React tries to render it:
+// "Element type is invalid", which blanks the WHOLE settings section.
+//
+// That is exactly how IconKey shipped: the host never exported it, the panel
+// rendered an empty page, and every test still passed. The fix was one word;
+// finding it took an afternoon. This group is the cheap version of that search.
+//
+// The list below is the host's real export surface (icons + the handful of
+// components the bundle uses), captured from
+// @deepseek-ai/dsh-client-ui-primitives 0.1.5-rc.2. It is public API, so it
+// belongs in this repo. When the host adds icons this only ever grows — a name
+// leaving the list would be a breaking host change worth noticing.
+{
+    const KNOWN_PRIMITIVES = new Set([
+        // components / helpers
+        'Button', 'Input', 'Tag', 'StateDot', 'Modal', 'Toast', 'writeClipboard',
+        // icons
+        'IconAgentPresetOutline16', 'IconAlarmClockOutline16', 'IconApiOutline14',
+        'IconArchiveOutline20', 'IconBranchOutline16', 'IconBrowseOutline16',
+        'IconCheckOutline14', 'IconCheckOutline16', 'IconChecklistOutline14',
+        'IconChevronDownOutline14', 'IconChevronLeftOutline14',
+        'IconChevronRightOutline14', 'IconChevronUpOutline14',
+        'IconClockOutline16', 'IconCloseFill14', 'IconCloseOutline16',
+        'IconCodeOutline16', 'IconContextInjectionOutline16', 'IconCopyOutline16',
+        'IconCordisPluginOutline14', 'IconDarkOutline16', 'IconDataOutline16',
+        'IconDatabaseOutline16', 'IconDislikeFill16', 'IconDislikeOutline16',
+        'IconDownloadOutline16', 'IconEditOutline16', 'IconEllipsisOutline16',
+        'IconEnhanceOutline16', 'IconFolderClose16', 'IconFolderOpen16',
+        'IconFolderOpenOutline16', 'IconFollowsystemOutline16',
+        'IconFullscreenOutline16', 'IconGaugeOutline16', 'IconGlobeOutline14',
+        'IconGoalOutline16', 'IconInspectOutline12', 'IconLightOutline16',
+        'IconLikeFill16', 'IconLikeOutline16', 'IconLinkOutline14',
+        'IconLinkOutline16', 'IconListPenOutline16', 'IconLoadingOutline16',
+        'IconNewChatOutline16', 'IconPanelLeftOutline16', 'IconPaperclipOutline16',
+        'IconPauseOutline16', 'IconPersonalizationOutline16', 'IconPlayOutline16',
+        'IconPlusOutline16', 'IconProjectAddOutline16', 'IconQuestionOutline14',
+        'IconQueueOutline14', 'IconRefreshOutline14', 'IconRefreshOutline16',
+        'IconRightUpOutline14', 'IconRightUpOutline16', 'IconSearchOutline16',
+        'IconSendOutline14', 'IconSendOutline16', 'IconSettingsOutline14',
+        'IconSettingsOutline16', 'IconShareOutline16', 'IconSkillOutline16',
+        'IconSparkle16', 'IconStopFill16', 'IconThinkOutline14',
+        'IconThinkOutline16', 'IconTrashOutline16', 'IconTreeCorner8x10',
+        'IconTriangleRightFill14', 'IconUserOutline16', 'IconWarningOutline16',
+    ]);
+
+    // Pull the destructure list straight out of the bundle so this cannot drift:
+    // if someone adds a name to the destructure and not to the list above, the
+    // assertion below fails.
+    const destructured = (() => {
+        // Anchor on the LAST `} = primitives;` and take the brace block that
+        // opens right before it. A plain non-greedy match starts at the first
+        // `const {` in the file — which is the react/jsx-runtime one — and
+        // swallows both destructures.
+        const end = source.lastIndexOf('} = primitives;');
+        if (end === -1) throw new Error('could not find the primitives destructure');
+        const open = source.lastIndexOf('const {', end);
+        if (open === -1) throw new Error('could not find the destructure opening brace');
+        const inner = source.slice(source.indexOf('{', open) + 1, end);
+        return inner.split(',').map(s => s.trim()).filter(s => s !== '');
+    })();
+
+    it('the destructure list was found and is non-trivial', () => destructured.length >= 10);
+    it('no unknown name is destructured from the primitives', () => {
+        const unknown = destructured.filter(n => !KNOWN_PRIMITIVES.has(n));
+        eq(unknown, []);
+        return true;
+    });
+}
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
