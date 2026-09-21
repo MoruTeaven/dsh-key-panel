@@ -1,0 +1,60 @@
+{
+  "name": "@moruteaven/dsh-key-panel",
+  "version": "0.3.0",
+  "description": "Managed secret store for DSH Desktop. Operator-owned keys, injected into the assistant's shell as $DSH_* variables, with a settings-page panel and three operator-controlled access modes.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "secrets",
+    "credentials",
+    "key-store"
+  ],
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "README.ja.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "test": "node test/run.mjs && node test/client.mjs",
+    "test:host": "node test/run.mjs",
+    "test:client": "node test/client.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.0",
+    "@deepseek-ai/dsh-home-paths": ">=0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": ">=0.1.5-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.5-rc.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

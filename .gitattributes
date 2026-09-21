@@ -1,0 +1,16 @@
+# Normalise line endings so a checkout on any OS produces byte-identical files.
+#
+# Without this, Git on Windows converts LF to CRLF on checkout, which shows up
+# as whole-file diffs, can break the byte-for-byte LICENSE check in CI, and makes
+# a Windows clone differ from a Linux one for no reason.
+* text=auto eol=lf
+
+# Keep binary files binary.
+*.png binary
+*.jpg binary
+*.ico binary
+*.tgz binary
+
+# Test fixtures must not be line-ending-mangled: comparison tests read them
+# literally.
+*.jsonl text eol=lf

@@ -1,0 +1,35 @@
+# Dependencies — installed from the host app, never committed.
+node_modules/
+
+# Plugin output. Both files live under $DSH_HOME/key-panel/, which is outside
+# this repo; these entries only guard against a stray local copy.
+key-panel/
+keys.json
+usage.jsonl
+*.local.json
+
+# Never commit npm credentials. A .npmrc here pointing at a private registry
+# would be published to a public repo — that is the whole reason the internal
+# registry is published with a command-line --registry instead. Ignoring it
+# costs nothing and removes the failure mode.
+.npmrc
+
+# Pack output. `npm pack` leaves a tarball behind; it must never be committed.
+*.tgz
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs and coverage
+*.log
+npm-debug.log*
+coverage/
+
+# Local backups
+*.bak
+*.orig

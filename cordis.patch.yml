@@ -1,0 +1,19 @@
+# @moruteaven/dsh-key-panel — bundle patch.
+#
+# `dsh.bundle.patch` is mandatory for any package listed in
+# `dsh.profile.bundles`: the desktop profile assembler throws
+#   "<profile> bundle "<name>" declares no dsh.bundle in its package.json"
+# when the field is missing, regardless of whether this file inserts rows.
+#
+# The row id below is what a patch-layer entry must match in order to toggle
+# this plugin. `applyEntryPatches` compares against `insert[].id` — NOT the
+# package name — so an entry reading `- id: dsh-key-panel` would silently do
+# nothing and leave only a "no loader entry matched" line in the host log.
+#
+# `name` is the module the loader actually imports, so it must be resolvable
+# from the profile's node_modules by that exact bare specifier. It must also
+# equal `package.json`'s name AND the id the client bundle registers in
+# `lib/client.js` — the host keys the client module graph by package name.
+- insert:
+    - id: key-panel
+      name: "@moruteaven/dsh-key-panel"

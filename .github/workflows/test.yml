@@ -1,0 +1,100 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # The suites are deliberately dependency-free: lib/policy.js and
+      # lib/store.js import nothing but node: builtins, and test/client.mjs
+      # loads the browser bundle against a stubbed loader. No npm install is
+      # needed, which also means these tests cannot be broken by a peer-
+      # dependency drift in a host app that CI does not have.
+      - name: Host suite (policy, store, tools, gateway)
+        run: node test/run.mjs
+
+      - name: Client bundle suite (contract, slots, RPC, dictionaries)
+        run: node test/client.mjs
+
+      # Packaging mistakes here surface as a recovery-mode boot for the user,
+      # not as a test failure, so assert them explicitly.
+      - name: Package manifest invariants
+        shell: bash
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+
+          const fail = m => { console.error('FAIL: ' + m); process.exit(1); };
+
+          // dsh.profile.bundles-style entry must be a bare name; the package
+          // name itself must satisfy the assembler's pattern.
+          const PATTERN = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*\$/u;
+          if (!PATTERN.test(pkg.name)) fail('package name is not a bare specifier: ' + pkg.name);
+
+          // Every bundle must declare dsh.bundle.patch or the assembler throws.
+          const patch = pkg.dsh && pkg.dsh.bundle && pkg.dsh.bundle.patch;
+          if (!patch) fail('missing dsh.bundle.patch');
+          if (!fs.existsSync(patch)) fail('dsh.bundle.patch points at a missing file: ' + patch);
+
+          // The patch file must contain at least one insert row with an id.
+          const yml = fs.readFileSync(patch, 'utf8');
+          if (!/insert:/.test(yml)) fail('patch file has no insert: key');
+          if (!/^\s*-\s*id:\s*\S+/m.test(yml)) fail('patch file has no row id');
+
+          // A declared dsh.client must ship exports["./client"].
+          if (pkg.dsh.client) {
+            if (pkg.dsh.client.platform !== 'web') fail('client platform is not web');
+            const client = pkg.exports && (pkg.exports['./client'] || pkg.exports['./client'].default);
+            if (!client) fail('dsh.client declared but exports[\"./client\"] is missing');
+            if (!fs.existsSync(client)) fail('exports[\"./client\"] points at a missing file: ' + client);
+            for (const dep of pkg.dsh.client.inject || []) {
+              if (!/^@[a-z0-9-]+\/[a-z0-9-]+\$/u.test(dep)) fail('suspicious inject entry: ' + dep);
+            }
+          }
+
+          for (const file of ['LICENSE', 'NOTICE', 'SECURITY.md', 'README.md', 'README.zh-CN.md', 'README.ja.md']) {
+            if (!fs.existsSync(file)) fail('missing publication file: ' + file);
+          }
+
+          // The declared SPDX id must match the license text actually shipped —
+          // a package.json that says one thing while LICENSE says another is a
+          // classic packaging bug that only shows up when someone audits it.
+          const licenseText = fs.readFileSync('LICENSE', 'utf8');
+          const SPDX_SIGNS = {
+            'Apache-2.0': /Apache License\s+Version 2\.0/,
+            'MIT': /MIT License|Permission is hereby granted, free of charge/,
+            'BSD-3-Clause': /Redistribution and use in source and binary forms/,
+            'BSD-2-Clause': /Redistribution and use in source and binary forms/,
+          };
+          const sign = SPDX_SIGNS[pkg.license];
+          if (!sign) fail('unrecognised SPDX id in package.json: ' + pkg.license);
+          if (!sign.test(licenseText)) fail('LICENSE text does not match the declared ' + pkg.license);
+
+          // Apache-2.0 ships a NOTICE; the file must not be empty.
+          if (pkg.license === 'Apache-2.0' && fs.statSync('NOTICE').size < 40) fail('NOTICE looks empty');
+
+          // Every file listed in `files` must exist, or npm publishes a broken tarball.
+          for (const entry of pkg.files || []) {
+            if (!fs.existsSync(entry)) fail('files[] entry does not exist: ' + entry);
+          }
+
+          console.log('package manifest OK — ' + pkg.name + '@' + pkg.version + ' (' + pkg.license + ')');
+          "
