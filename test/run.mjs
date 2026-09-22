@@ -1079,6 +1079,45 @@ describe('[22] every remote method has a Typert-legal signature');
         eq(m[1], '');
         return true;
     });
+
+    // E-11 in plugin-contract.md, and the reason this group exists at all.
+    //
+    // Typert discovers remotes by scanning the SOURCE, and the scan does not
+    // skip comments. After fixing the signature above, the same failure came
+    // back because the fix documented itself by quoting the broken signature
+    // in the doc comment - which the scanner then read as a real one.
+    //
+    // So the check below is deliberately NOT limited to method-definition
+    // lines. Any occurrence of a marked method name followed by a parameter
+    // list containing a default, a destructure or a rest is an offender,
+    // wherever it sits: code, comment, or string.
+    it('no malformed signature shape appears anywhere in the source', () => {
+        // Scanned LINE BY LINE, and a line counts if it is a comment or a
+        // method definition. Anchoring on the line - not on a trailing brace -
+        // is what makes the comment case visible: `* usage(limit = 200)` has no
+        // brace after it, so a brace-anchored pattern never sees it.
+        const found = [];
+        for (const raw of source.split('\n')) {
+            const line = raw.trim();
+            const isComment = line.startsWith('*') || line.startsWith('//') || line.startsWith('/*');
+            const isDefinition = /^[A-Za-z#_$][A-Za-z0-9_$]*\s*[(]/.test(line);
+            if (!isComment && !isDefinition) continue;
+            for (const name of remote) {
+                const at = line.indexOf(name + '(');
+                if (at === -1) continue;
+                const open = at + name.length + 1;
+                const close = line.indexOf(')', open);
+                if (close === -1) continue;
+                const params = line.slice(open, close).trim();
+                if (params === '') continue;
+                const illegal = params.includes('=') || params.includes('{')
+                    || params.includes('[') || params.startsWith('...');
+                if (illegal) found.push(line.slice(0, 80));
+            }
+        }
+        eq(found, []);
+        return true;
+    });
 }
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
