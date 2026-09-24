@@ -39,8 +39,9 @@ Assistant needs to deploy a Worker
 - **Recent activity.** A log of what each shell command was handed, alongside the
   purposes the assistant chose to declare. The two are shown together, never
   paired. Names and timestamps only — no value is ever written to it.
-- **Optional name scope.** Restrict the assistant to names matching `DSH_AGENT_*`
-  and nothing else.
+- **Name scope (not exposed yet).** The host can restrict the assistant to names
+  matching `DSH_AGENT_*`, and does enforce a scope already in the store, but the
+  panel field is hidden in this release.
 - **Two-phase deletion.** Deleting needs a second, confirmed call with a
   short-lived token — a single stray tool call cannot remove a key.
 - **Values never reach the model.** No tool returns a key value, in any mode.
@@ -92,6 +93,18 @@ The panel shows both names before you commit, so you can see what will land in
 the shell. Identifiers are uppercase letters, digits and underscore; lowercase is
 rejected rather than silently uppercased, because a name you did not ask for is
 worse than one you have to retype.
+
+**Fill in the values from the account itself.** Once the account exists, its two
+variable names are already decided — they are derived from the identifiers, not
+chosen by you. So the account row carries a **Fill in keys** button that opens a
+popup collecting both values at once and files them under that account. The
+derived names are shown in the popup but never typed, which is the point: making
+you carry a name the plugin computed up to the flat **Add key** card, once per
+field, was transcription.
+
+Each slot shows whether it holds a value, and a slot can be left blank for now.
+**Add key** is still there for ungrouped keys, which have no account to be filled
+in from.
 
 Each platform and account also takes a **display name**, which is what the panel
 shows. It is separate from the identifier on purpose: identifiers are baked into
@@ -155,7 +168,7 @@ timestamps only. No value is ever written to it.**
 
 | Mode | Assistant can | Assistant cannot |
 | --- | --- | --- |
-| `readonly` *(default)* | use keys | change anything — no write tool is registered |
+| `readonly` *(default)* | use keys | change anything — **no model-facing tool is registered at all** |
 | `write` | add keys; replace keys it created | delete anything; edit your keys |
 | `edit` | add, change, delete | — (delete still needs confirmation) |
 
@@ -166,7 +179,13 @@ its own credentials — that is the one workflow the other two modes exist for.
 
 ### Restrict by name
 
-The optional scope field limits the assistant to matching names:
+> **Not exposed in the panel yet.** The scope itself works — it is validated,
+> persisted, and enforced on every model call, and a scope already in the store
+> keeps applying. Only the field that *sets* it is hidden for now, behind the
+> `SHOW_SCOPE_UI` flag in `lib/client.js`. Set it by hand in the store if you
+> need it; flipping the flag brings the field back.
+
+The scope limits the assistant to matching names:
 
 | Value | Effect |
 | --- | --- |
@@ -182,7 +201,7 @@ A single `*` is the only metacharacter. It cannot express a path or a regex.
 | Setting | Where | Default |
 | --- | --- | --- |
 | Access mode | Panel | `readonly` |
-| Name scope | Panel | unrestricted |
+| Name scope | Store only (field hidden) | unrestricted |
 | Store location | `$DSH_HOME/key-panel/keys.json` | `~/.dsh/key-panel/keys.json` |
 | Activity log | `$DSH_HOME/key-panel/usage.jsonl` | `~/.dsh/key-panel/usage.jsonl` |
 
@@ -218,7 +237,6 @@ renamed-but-empty file behind — which would read back as "all keys deleted".
 
 A version 1 file loads as-is: the grouping fields are optional, so keys written
 before platforms existed simply read back as ungrouped. No migration step.
-
 
 ### `usage.jsonl`
 
@@ -258,14 +276,15 @@ The short version:
 - The assistant can never read a key value into its transcript, in any mode.
 - The assistant can never change the access mode or the scope — those are
   operator-only.
-- In `readonly`, the write tools do not exist rather than refusing.
+- In `readonly`, the model-facing tools do not exist rather than refusing —
+  the capability is absent, not argued about.
 
 ## Development
 
 ```bash
-npm test          # both suites — 180 assertions
-npm run test:host # host half: policy, store, tools, gateway (139)
-npm run test:client # client bundle: contract, slots, RPC, dictionaries (41)
+npm test            # both suites — 427 assertions
+npm run test:host   # host half: policy, store, tools, gateway (298)
+npm run test:client # client bundle: contract, slots, RPC, dictionaries (129)
 ```
 
 The client suite loads `lib/client.js` the way the real frontend does — a fake
