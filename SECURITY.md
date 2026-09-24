@@ -71,7 +71,7 @@ absence does not. An argument about permissions is a thing a model can be talked
 out of, and a tool that exists is a tool that can be mis-invoked. There is no
 prompt that reveals a capability that was never registered.
 
-### Provenance, and why a model cannot escalate
+### Provenance, and what it does and does not prevent
 
 Each key records who created it:
 
@@ -85,12 +85,41 @@ but it cannot launder the key into its own namespace and then delete "its own"
 key. Deletion in `write` mode is refused for *all* keys regardless of origin, so
 there is no sequence of writes that unlocks deletion.
 
+**Provenance is a `write`-mode control, and `edit` mode does not apply it.**
+This is deliberate and worth stating plainly, because it is the one place the
+mode table above is doing real security work:
+
+| Mode | Replacing the value of an operator-created key |
+| --- | --- |
+| `write` | **Refused** — the check above is what enforces it |
+| `edit` | **Allowed**, with no provenance check |
+
+So "the assistant cannot overwrite a key you created" is a property of `write`,
+not of the plugin. Choosing `edit` grants it, because `edit` already grants
+deletion of the same key — a mode that permits destroying a secret but not
+changing it would be a boundary in name only. The remaining guard on replacement
+in `edit` mode is the scope restriction, if one is set. Treat `edit` as "the
+assistant may do anything to any key in scope", which is what the table says.
+
 ### Scope restriction
 
 The optional `scopePattern` is a second, independent limit on which names the
 assistant may touch — for example `DSH_AGENT_*`. It is a single-metacharacter
 glob (`*`), not a regex, and it can only express `DSH_`-prefixed names. It cannot
 be used to reach a path or a non-key resource.
+
+**As shipped, the panel does not offer a control to set it.** The mechanism
+itself is complete and enforced: the value is validated, persisted, re-read on
+every model call, and a scope already present in the store keeps applying. What
+is absent is the field that *writes* it, which is hidden behind the
+`SHOW_SCOPE_UI` flag in `lib/client.js`. Set it by hand in the store file, or
+flip the flag, to use it.
+
+This is a deliberate release decision, not an oversight, and it has a security
+consequence worth being explicit about: **out of the box, the only thing
+bounding which keys the assistant may touch is the access mode.** If you want a
+scope, you must set one yourself. An unset scope means no restriction — the
+assistant reaches every key the mode allows.
 
 ### Changing the mode is operator-only
 

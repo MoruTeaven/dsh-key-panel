@@ -185,6 +185,11 @@ its own credentials — that is the one workflow the other two modes exist for.
 > `SHOW_SCOPE_UI` flag in `lib/client.js`. Set it by hand in the store if you
 > need it; flipping the flag brings the field back.
 
+This has a security consequence worth knowing before you pick a mode: **with no
+scope set, the access mode is the only thing limiting which keys the assistant
+can reach.** An unset scope means no restriction. If you want a narrower
+boundary, set one — in the store by hand for now.
+
 The scope limits the assistant to matching names:
 
 | Value | Effect |
