@@ -183,24 +183,40 @@ it('endpoints match the gateway', () => eq(calls.map(c => c.endpoint), [
     'keyPanel/addAccount', 'keyPanel/setAccountLabel', 'keyPanel/removeAccount',
     'keyPanel/credentialNames',
 ]));
-it('set() sends {keyName, value, description}',
-    () => eq(calls[2].payload.args, { keyName: 'DSH_X', value: 'v', description: 'd' }));
+it('set() sends {keyName, value, description, slot}',
+    () => eq(calls[2].payload.args, { keyName: 'DSH_X', value: 'v', description: 'd', slot: null }));
 it('remove() sends {keyName}', () => eq(calls[3].payload.args, { keyName: 'DSH_X' }));
 it('reveal() sends {keyName}', () => eq(calls[4].payload.args, { keyName: 'DSH_X' }));
 it('setPolicy() sends {accessMode, scopePattern}',
     () => eq(calls[6].payload.args, { accessMode: 'edit', scopePattern: 'DSH_AGENT_*' }));
-it('setKey() spreads the slot into the args when one is given',
+// The slot is ONE nested field named "slot" — it is NOT spread into the args.
+//
+// Typert derives a remote's wire fields from the HOST METHOD'S PARAMETER NAMES,
+// and set() is declared set(keyName, value, description, slot). Spreading
+// platform/account/field produced three names the descriptor does not list, and
+// the gateway refused every filed write:
+//
+//   gateway/arguments-invalid: keyPanel/set: args fields do not match the
+//   descriptor: unexpected "platform", "account", "field"
+//
+// The whole fill-in-from-an-account popup was unsavable and this suite stayed
+// green, because the stub below returns {ok:true} for any payload and never
+// checks it against a descriptor. Group [23] is the check that would have.
+it('setKey() nests the slot under "slot" when one is given',
     async () => {
         calls.length = 0;
         await api.setKey('DSH_CF_WORK_KEY', 'v', 'd', { platform: 'CF', account: 'WORK', field: 'key' });
-        eq(calls[0].payload.args, { keyName: 'DSH_CF_WORK_KEY', value: 'v', description: 'd', platform: 'CF', account: 'WORK', field: 'key' });
+        eq(calls[0].payload.args, { keyName: 'DSH_CF_WORK_KEY', value: 'v', description: 'd', slot: { platform: 'CF', account: 'WORK', field: 'key' } });
         return true;
     });
-it('setKey() omits the slot entirely when none is given',
+it('setKey() names "slot" even when none is given',
     async () => {
+        // Present-but-null, not absent: the descriptor lists "slot", so omitting
+        // it would be a MISSING field. The host reads a nullish slot as "leave
+        // the existing filing alone", which is the same thing an absent one did.
         calls.length = 0;
         await api.setKey('DSH_X', 'v', 'd');
-        eq(calls[0].payload.args, { keyName: 'DSH_X', value: 'v', description: 'd' });
+        eq(calls[0].payload.args, { keyName: 'DSH_X', value: 'v', description: 'd', slot: null });
         return true;
     });
 // Re-issue the grouping calls against a fresh log before asserting on them.
@@ -531,6 +547,255 @@ describe('[10] platform-group rendering');
 }
 
 
+// ── The name-scope field is hidden in this release ─────────────────────────
+describe('[11] the name-scope field is hidden');
+{
+    // The scope restriction ("the assistant may only touch DSH_AGENT_*") is not
+    // shipping yet, so its entry point is hidden behind SHOW_SCOPE_UI in the
+    // bundle. The capability underneath is untouched: policy.js still validates
+    // and enforces a scope, the store still persists one, and the host suite
+    // still covers all of it. This group protects the DELIBERATE omission — a
+    // refactor that reinstates the field by accident, or a flag flipped before
+    // the feature is ready, shows up here.
+    //
+    // The flag is read out of the bundle rather than restated, so the assertion
+    // cannot drift from the code it describes.
+    const flagOff = /const SHOW_SCOPE_UI = false;/.test(source);
+    const flagOn = /const SHOW_SCOPE_UI = true;/.test(source);
+    it('the bundle declares SHOW_SCOPE_UI exactly once',
+        () => eq((source.match(/SHOW_SCOPE_UI = (?:true|false);/g) || []).length, 1));
+    it('the scope field is guarded by the flag', () => eq(/SHOW_SCOPE_UI && jsx/.test(source), true));
+    it('the dictionaries still carry the scope strings',
+        () => eq(['scopeLabel:', 'scopeHint:'].every(k => source.includes(k)), true));
+
+    // One render of the section, walked with a VNode harvester that descends
+    // into function components. A function VNode is otherwise opaque, and the
+    // card this test is about IS one.
+    const vnodeShim2 = spec => {
+        if (spec === 'react') return reactStub;
+        if (spec === 'react/jsx-runtime') { const make = (type, props, key) => ({ type, props: props ?? {}, key }); return { jsx: make, jsxs: make, Fragment: 'Fragment' }; }
+        if (spec === '@deepseek-ai/dsh-client-ui-primitives') return primitivesStub;
+        throw new Error(`unexpected seed word: ${spec}`);
+    };
+    const ex2 = captured.factory(vnodeShim2);
+
+    const harvest = (node, seen, texts, classes) => {
+        if (node === null || node === undefined) return;
+        if (typeof node === 'string') { texts.push(node); return; }
+        if (typeof node === 'number') return;
+        if (Array.isArray(node)) { for (const child of node) harvest(child, seen, texts, classes); return; }
+        if (typeof node !== 'object') return;
+        if (typeof node.type === 'function') {
+            seen.add(node.type.name || 'anonymous');
+            harvest(node.type(node.props || {}), seen, texts, classes);
+            return;
+        }
+        if (typeof node.type === 'string') seen.add(node.type);
+        const props = node.props || {};
+        if (typeof props.className === 'string') classes.push(props.className);
+        if (typeof props.placeholder === 'string') classes.push('PH:' + props.placeholder);
+        for (const key of Object.keys(props)) {
+            if (key === 'key' || key === 'type') continue;
+            harvest(props[key], seen, texts, classes);
+        }
+    };
+
+    // Hook slot 3 is the policy state. Seeding it is how the card is reached
+    // without running effects, which this stub does not do.
+    const seedPolicy = policy => {
+        let cursor2 = 0;
+        const hookStore = [];
+        reactStub.useState = init => {
+            const i = cursor2++;
+            if (hookStore[i] === undefined) hookStore[i] = typeof init === 'function' ? init() : init;
+            return [hookStore[i], value => { hookStore[i] = typeof value === 'function' ? value(hookStore[i]) : value; }];
+        };
+        hookStore[3] = policy;
+        const seen = new Set(), texts = [], classes = [];
+        harvest(ex2.KeyPanelSection({
+            t: key => key,
+            status: async () => ({}), list: async () => [], setKey: async () => {}, removeKey: async () => {}, revealKey: async () => {},
+            // A scope IS set: if the field were only restyled away, the card
+            // would still render something. Seeding a scope is the strict case.
+            getPolicy: async () => policy, setPolicy: async () => ({}),
+            groups: async () => ({ platforms: [], accounts: [] }),
+            addPlatform: async () => {}, setPlatformLabel: async () => {}, removePlatform: async () => {},
+            addAccount: async () => {}, setAccountLabel: async () => {}, removeAccount: async () => {},
+            credentialNames: async () => [], usage: async () => ({ entries: [], total: 0, limit: 200 }),
+        }), seen, texts, classes);
+        return { seen, texts, classes };
+    };
+
+    const withScope = seedPolicy({ accessMode: 'edit', scopePattern: 'DSH_AGENT_*' });
+    it('renders the access card itself', () => eq(withScope.texts.includes('policyTitle'), true));
+    it('renders the mode choices', () => eq(withScope.classes.includes('kp-modes'), true));
+    it('hides the scope label', () => eq(withScope.texts.includes('scopeLabel'), false));
+    it('hides the scope hint', () => eq(withScope.texts.includes('scopeHint'), false));
+    it('hides the scope input', () => eq(withScope.classes.includes('PH:DSH_AGENT_*'), false));
+    it('hides the scope row', () => eq(withScope.classes.includes('kp-field'), false));
+    it('keeps the edit-mode warning', () => eq(withScope.texts.includes('warnEdit'), true));
+
+    it('the flag is off in this release', () => {
+        eq(flagOff, true);
+        eq(flagOn, false);
+        return true;
+    });
+}
+
+
+// ── Filling a key in FROM the account, not from the flat card ──────────────
+describe('[13] filling a key in from the account row');
+{
+    // The gap this group protects: a platform and an account are created, and
+    // the panel shows the two derived variable names — but nothing on the row
+    // can put a VALUE into them. The operator had to carry a name the plugin
+    // computed up to the flat "Add key" card and retype it, once per field.
+    // That is transcription, not input, and it is what the popup removes.
+    const vnodeShim3 = spec => {
+        if (spec === 'react') return reactStub;
+        if (spec === 'react/jsx-runtime') { const make = (type, props, key) => ({ type, props: props ?? {}, key }); return { jsx: make, jsxs: make, Fragment: 'Fragment' }; }
+        if (spec === '@deepseek-ai/dsh-client-ui-primitives') return primitivesStub;
+        throw new Error('unexpected seed word: ' + spec);
+    };
+    const ex3 = captured.factory(vnodeShim3);
+    const PlatformGroup = ex3.PlatformGroup;
+
+    // Executes the component for real, descending into function VNodes so the
+    // Modal and its contents are reachable, recording every handler and value.
+    const harvest = (node, out) => {
+        if (node === null || node === undefined) return;
+        if (typeof node === 'string') { out.texts.push(node); return; }
+        if (typeof node === 'number') return;
+        if (Array.isArray(node)) { for (const child of node) harvest(child, out); return; }
+        if (typeof node !== 'object') return;
+        // The primitives stub hands back a fresh () => null for every property
+        // read, so a node.type === ex3.Modal identity check can never be true.
+        // Identify the Modal by shape instead: the only node carrying an
+        // 'open' flag together with a 'footer' array.
+        if (node.props && node.props.open !== undefined && Array.isArray(node.props.footer)) out.modals.push(node.props);
+        if (typeof node.type === 'function' && node.type.name) out.seen.add(node.type.name);
+        if (typeof node.type === 'string') out.seen.add(node.type);
+        const props = node.props || {};
+        if (typeof props.className === 'string') out.classes.push(props.className);
+        if (typeof props.value === 'string') out.values.push(props.value);
+        if (typeof props.onClick === 'function') out.clicks.push(props.onClick);
+        for (const key of Object.keys(props)) {
+            if (key === 'key' || key === 'type' || key === 'onClick') continue;
+            harvest(props[key], out);
+        }
+        // Only AFTER the props are walked: the stub renders every primitive as
+        // () => null, so the output adds nothing here but would be lost if it
+        // replaced the props walk. Kept so a real component still descends.
+        if (typeof node.type === 'function') {
+            harvest(node.type(props), out);
+        }
+    };
+
+    // One render with a seeded hook store. Hook slot 5 is slotDraft — seeding it is
+    // how the popup is reached without running the click that opens it.
+    const render = (props, seed = {}, slotDraftSeed) => {
+        let cursor = 0;
+        const store = [];
+        reactStub.useState = init => {
+            const i = cursor++;
+            if (store[i] === undefined) store[i] = typeof init === 'function' ? init() : init;
+            return [store[i], value => { store[i] = typeof value === 'function' ? value(store[i]) : value; }];
+        };
+        if (slotDraftSeed !== undefined) store[5] = slotDraftSeed;
+        const out = { seen: new Set(), texts: [], classes: [], values: [], clicks: [], modals: [] };
+        harvest(PlatformGroup({
+            t: key => key, busy: false,
+            onAddPlatform: () => {}, onAddAccount: () => {}, onRenamePlatform: () => {}, onRenameAccount: () => {},
+            onRemovePlatform: () => {}, onRemoveAccount: () => {}, onError: () => {},
+            setKey: seed.setKey ?? (async () => {}),
+            ...props,
+        }), out);
+        return { out, store };
+    };
+
+    const groups = { platforms: [{ identifier: 'CF', label: 'Cloudflare' }], accounts: [{ platform: 'CF', identifier: 'WORK', label: 'Work' }] };
+
+    // ── The row tells you whether a slot is actually filled ────────────────
+    const nothing = render({ groups, keys: [] });
+    it('an empty slot is labelled as such', () => eq(nothing.out.texts.includes('slotEmpty'), true));
+    it('an empty slot is not labelled as filled', () => eq(nothing.out.texts.includes('slotFilled'), false));
+
+    const half = render({ groups, keys: [{ name: 'DSH_CF_WORK_KEY' }] });
+    it('a slot that holds a value is labelled as filled', () => eq(half.out.texts.includes('slotFilled'), true));
+    it('the other slot still reads as empty', () => eq(half.out.texts.includes('slotEmpty'), true));
+
+    // ── The entry point lives on the account row ──────────────────────────
+    it('the account row offers the fill entry point', () => eq(nothing.out.texts.includes('fillKey'), true));
+
+    // ── The popup states the two names before anything is typed ────────────
+    const open = render({ groups, keys: [] }, {}, { platform: 'CF', identifier: 'WORK', label: 'Work', id: '', key: '', error: null });
+    it('the popup opens as a Modal', () => eq(open.out.modals.length, 1));
+    it('the popup shows both derived names', () => {
+        eq(open.out.texts.includes('DSH_CF_WORK_ID'), true);
+        eq(open.out.texts.includes('DSH_CF_WORK_KEY'), true);
+        return true;
+    });
+    it('the popup has one field per credential slot', () => eq(open.out.values.length, 2));
+    it('the popup carries a save and a cancel', () => eq(open.out.modals[0].footer.length, 2));
+    it('the footer exposes a save button', () => typeof open.out.modals[0].footer.find(b => b.key === 'save').props.onClick === 'function');
+
+    // ── Saving files both values under the account ─────────────────────────
+    // The slot is the whole point: it is what makes a key BELONG to the
+    // account rather than merely happening to share its name.
+    {
+        const calls = [];
+        const one = render({ groups, keys: [] }, { setKey: async (name, value, description, slot) => { calls.push({ name, value, slot }); } },
+            { platform: 'CF', identifier: 'WORK', label: 'Work', id: '', key: 'tok-456', error: null });
+        it('the popup does not write merely by rendering', () => eq(calls.length, 0));
+        await one.out.modals[0].footer.find(b => b.key === 'save').props.onClick();
+        it('a single filled slot writes exactly one key', () => eq(calls.length, 1));
+        it('the write uses the derived name, never a typed one', () => eq(calls[0].name, 'DSH_CF_WORK_KEY'));
+        it('the write is filed under the account', () => eq(calls[0].slot, { platform: 'CF', account: 'WORK', field: 'key' }));
+    }
+
+    {
+        const calls = [];
+        const both = render({ groups, keys: [] }, { setKey: async (name, value, description, slot) => { calls.push({ name, slot }); } },
+            { platform: 'CF', identifier: 'WORK', label: 'Work', id: 'acct-123', key: 'tok-456', error: null });
+        await both.out.modals[0].footer.find(b => b.key === 'save').props.onClick();
+        it('both slots writes two keys', () => eq(calls.length, 2));
+        it('the id slot is written first', () => eq(calls[0].name, 'DSH_CF_WORK_ID'));
+        it('the key slot is written second', () => eq(calls[1].name, 'DSH_CF_WORK_KEY'));
+    }
+
+    // ── An all-blank submit is refused, not sent ───────────────────────────
+    {
+        const calls = [];
+        const blank = render({ groups, keys: [] }, { setKey: async (...a) => { calls.push(a); } },
+            { platform: 'CF', identifier: 'WORK', label: 'Work', id: '', key: '', error: null });
+        await blank.out.modals[0].footer.find(b => b.key === 'save').props.onClick();
+        it('an all-blank submit writes nothing', () => eq(calls.length, 0));
+        it('an all-blank submit reports the refusal', () => eq(blank.store[5].error, 'fillNone'));
+    }
+
+    // ── A failed write surfaces rather than vanishing ──────────────────────
+    {
+        const boom = render({ groups, keys: [] }, { setKey: async () => { throw new Error('host refused'); } },
+            { platform: 'CF', identifier: 'WORK', label: 'Work', id: 'acct-123', key: '', error: null });
+        await boom.out.modals[0].footer.find(b => b.key === 'save').props.onClick();
+        it('a refused write keeps the popup open', () => eq(boom.store[5] !== null, true));
+        it('a refused write reports the reason', () => eq(String(boom.store[5].error).includes('host refused'), true));
+    }
+
+    // ── The flat card is NOT removed ───────────────────────────────────────
+    // Ungrouped keys have no account to be filled in from, so the flat entry
+    // point has to stay. This asserts the popup was an ADDITION, not a move.
+    it('the flat add-key entry point still exists', () => eq(source.includes('t("addKey")'), true));
+
+    // ── The dictionaries carry the new strings ─────────────────────────────
+    it('the new popup strings are defined', () => {
+        for (const key of ['fillKey:', 'fillKeyTitle:', 'fillKeyLead:', 'slotId:', 'slotKey:', 'slotEmpty:', 'slotFilled:', 'slotKeepHint:', 'fillSave:', 'fillNone:']) {
+            if (!source.includes(key)) throw new Error('missing dictionary key ' + key);
+        }
+        return true;
+    });
+}
+
 describe('[12] every primitive the bundle destructures actually exists');
 // The bundle pulls ~15 names out of @deepseek-ai/dsh-client-ui-primitives by
 // destructuring. A name that does not exist is `undefined` — no import error,
@@ -602,5 +867,208 @@ describe('[12] every primitive the bundle destructures actually exists');
         return true;
     });
 }
+// ── Every client payload matches the host descriptor it will meet ──────────
+describe('[23] every client RPC payload matches the host descriptor');
+// The gap that let the filled-in-from-an-account popup break in production.
+//
+// Typert derives a remote's wire fields from the HOST METHOD'S PARAMETER NAMES
+// (methodParameterNames, via Function.prototype.toString) and then
+// assertExactArguments rejects any payload carrying a key the descriptor does
+// not list, or missing one it does. The client half and the host half were each
+// tested against their own assumption — the client suite stubbed rpc.call to
+// return {ok:true} for anything — so nothing compared the two.
+//
+// This group does that comparison for real. It reads the parameter names off
+// the ACTUAL host gateway (never a list restated here, which would be circular)
+// and replays the panel's own calls against them.
+{
+    // The host half is a plain ESM module; import it exactly as the app does.
+    const host = await import(pathToFileURL(join(ROOT, 'lib/index.js')).href);
+    const { KeyPanelGateway } = host;
+
+    // Transcribed from the gateway's own methodParameterNames().
+    const wireFields = (name) => {
+        const fn = KeyPanelGateway.prototype[name];
+        if (typeof fn !== 'function') throw new Error(`host gateway has no method ${name}`);
+        const src = Function.prototype.toString.call(fn);
+        const open = src.indexOf('(');
+        const close = src.indexOf(')', open + 1);
+        const body = src.slice(open + 1, close).trim();
+        return body.length === 0 ? [] : body.split(',').map(s => s.trim());
+    };
+
+    // Transcribed from the gateway's own assertExactArguments().
+    const mismatch = (args, expected) => {
+        const extra = Object.keys(args).filter(k => !expected.includes(k));
+        const missing = expected.filter(k => !Object.hasOwn(args, k));
+        if (extra.length === 0 && missing.length === 0) return null;
+        const clauses = [];
+        if (missing.length > 0) clauses.push(`missing ${missing.map(k => JSON.stringify(k)).join(', ')}`);
+        if (extra.length > 0) clauses.push(`unexpected ${extra.map(k => JSON.stringify(k)).join(', ')}`);
+        return `args fields do not match the descriptor: ${clauses.join('; ')}`;
+    };
+
+    it('the gateway exposes its remote methods to check', () => typeof KeyPanelGateway.prototype.set === 'function');
+
+    // Replay the panel's whole call surface, exactly as the section issues it.
+    const seen = [];
+    const ctx23 = makeCtx(async (channel, endpoint, payload) => {
+        const method = endpoint.startsWith('keyPanel/') ? endpoint.slice('keyPanel/'.length) : null;
+        if (method !== null) seen.push({ method, args: payload.args });
+        return { ok: true, value: {} };
+    });
+    registered = null;
+    const ex23 = captured.factory(requireShim);
+    ex23.apply(ctx23);
+    const api23 = registered.options.inject();
+
+    await api23.list();
+    await api23.status();
+    await api23.setKey('DSH_X', 'v', 'd');
+    await api23.setKey('DSH_CF_WORK_KEY', 'v', 'd', { platform: 'CF', account: 'WORK', field: 'key' });
+    await api23.removeKey('DSH_X');
+    await api23.revealKey('DSH_X');
+    await api23.getPolicy();
+    await api23.setPolicy('edit', 'DSH_AGENT_*');
+    await api23.groups();
+    await api23.addPlatform('CF', 'Cloudflare');
+    await api23.setPlatformLabel('CF', 'Cloudflare Inc');
+    await api23.removePlatform('CF', true);
+    await api23.addAccount('CF', 'WORK', 'Work');
+    await api23.setAccountLabel('CF', 'WORK', 'Work acct');
+    await api23.removeAccount('CF', 'WORK', true);
+    await api23.credentialNames('CF', 'WORK');
+    await api23.usage();
+
+    // Map each client call to the host method it targets.
+    const HOST_METHOD = {
+        list: 'list', status: 'status', set: 'set', remove: 'remove', reveal: 'reveal',
+        getPolicy: 'getPolicy', setPolicy: 'setPolicy', groups: 'groups',
+        addPlatform: 'addPlatform', setPlatformLabel: 'setPlatformLabel', removePlatform: 'removePlatform',
+        addAccount: 'addAccount', setAccountLabel: 'setAccountLabel', removeAccount: 'removeAccount',
+        credentialNames: 'credentialNames', usage: 'usage',
+    };
+
+    const offenders = [];
+    for (const call of seen) {
+        const hostMethod = HOST_METHOD[call.method];
+        if (hostMethod === undefined) continue;
+        const bad = mismatch(call.args, wireFields(hostMethod));
+        // Report the offending METHOD, not the payload: a failure message that
+        // prints the args would put a secret in the suite's output.
+        if (bad !== null) offenders.push(`${call.method}: ${bad}`);
+    }
+    it('no client payload carries a field the host descriptor does not list', () => {
+        eq(offenders, []);
+        return true;
+    });
+
+    it('every remote the panel calls actually exists on the gateway', () => {
+        const absent = [...new Set(seen.map(c => c.method))].filter(m => typeof KeyPanelGateway.prototype[HOST_METHOD[m] ?? m] !== 'function');
+        eq(absent, []);
+        return true;
+    });
+
+    // The regression itself, pinned by name. Losing this one line is what made
+    // the whole fill-in-from-an-account flow unsavable.
+    it('set() takes the slot as ONE parameter, not three spread fields', () => {
+        eq(wireFields('set'), ['keyName', 'value', 'description', 'slot']);
+        return true;
+    });
+}
+
+// ── [24] the bundle body did not lose its shape ──────────────────────────────
+//
+// A structural defect this suite could not see: a doc comment whose statement
+// was deleted, left stacked against the next declaration, and a run of
+// declarations that had been dedented out of their block. Both are invisible to
+// every assertion above — the factory still parses, still exports, still
+// renders — yet they are unambiguous damage in a repo whose whole point is that
+// `lib/` IS the shipped source. Rendering cannot catch them and neither could
+// the RPC contract, so the shape is asserted directly.
+{
+    const body = source.slice(source.indexOf('{', source.indexOf('window.__ModuleLoader__.load')));
+
+    it('no doc comment is left with no statement under it', () => {
+        // A `/** ... */` comment immediately followed by another `/**` means the
+        // declaration the first one described is gone. Comments may document each
+        // other only in the `//` style, never as two block comments in a row.
+        const stacked = /\/\*\*[\s\S]*?\*\/\s*\/\*\*/.test(body);
+        eq(stacked, false);
+        return true;
+    });
+
+    it('no declaration is dedented out of its enclosing block', () => {
+        // Anchored on the ENCLOSING FUNCTION's body indent, which is the only
+        // thing that can see the defect at all.
+        //
+        // Why nothing local works: the collapsed run was self-consistent — it
+        // opened `[` and closed `]` at the same indent, and every line of the run
+        // shared one level. So an opener/closer check, a brace-depth check and a
+        // neighbour comparison ALL stay silent on it. Two earlier versions of this
+        // test were written that way and each passed on the deliberately broken
+        // file; both were replaced. The only reference that is not part of the
+        // damaged run is the function body CONTAINING it.
+        //
+        // So: for each `function NAME(...) {` in the bundle, take the indent of its
+        // first statement as the body's true level, then require that every
+        // statement inside that function sits at that level or deeper. A run that
+        // has been shifted out of the body — the actual bug — is shallower than it,
+        // and is caught. Measured on the real file, this reports zero offenders.
+        const stripped = body
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+        const lines = stripped.split('\n');
+        const offenders = [];
+
+        // Indent expected inside each open function body, innermost last.
+        const expected = [];
+        let pendingFunction = null;
+
+        for (let i = 0; i < lines.length; i += 1) {
+            const raw = lines[i];
+            const trimmed = raw.trim();
+            if (trimmed === '') continue;
+            const indent = raw.match(/^\t*/)[0].length;
+
+            // A function header opens a body whose level is set by its first
+            // statement, not by assumption.
+            if (/^(?:function\s+\w+|\w+\s*:\s*function)/.test(trimmed) && /\{\s*$/.test(trimmed)) {
+                pendingFunction = { headerLine: i + 1, headerIndent: indent, body: null };
+                expected.push(pendingFunction);
+                continue;
+            }
+
+            if (pendingFunction !== null && pendingFunction.body === null) {
+                // First statement of the body defines its true indent.
+                pendingFunction.body = indent;
+                pendingFunction = null;
+            }
+
+            const enclosing = expected.length > 0 ? expected[expected.length - 1] : null;
+            if (enclosing !== null && enclosing.body !== null) {
+                // A standalone closer at the body's own level is fine; anything
+                // shallower than the body while not being the closing brace is a
+                // statement that escaped its block.
+                const isCloser = /^\}/.test(trimmed);
+                if (indent < enclosing.body && !isCloser && indent <= enclosing.headerIndent) {
+                    offenders.push(`line ${i + 1}: "${trimmed.slice(0, 34)}" at ${indent} tabs, inside a body at ${enclosing.body} (function at ${enclosing.headerLine})`);
+                }
+            }
+
+            // Close the innermost function when its own brace returns to header level.
+            if (enclosing !== null && isCloserFor(trimmed) && indent === enclosing.headerIndent) {
+                expected.pop();
+            }
+        }
+
+        function isCloserFor(t) { return t === '}' || t.startsWith('},') || t.startsWith('});'); }
+
+        eq(offenders, []);
+        return true;
+    });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

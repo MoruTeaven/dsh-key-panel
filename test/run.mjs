@@ -1118,6 +1118,27 @@ describe('[22] every remote method has a Typert-legal signature');
         eq(found, []);
         return true;
     });
+
+    it('no instance property shadows a remote method name', () => {
+        // The gateway resolves remotes with Reflect.get(receiver, name) on the
+        // SERVICE INSTANCE. An own property named like a marked method shadows
+        // the prototype method: the marker scan (prototype) still passes, the
+        // invocation (instance) finds a non-function, and the host answers
+        // gateway/method-unavailable. This exact collision - this.usage holding
+        // the UsageLog while a remote method usage() exists - broke the
+        // activity card in production and survived four restarts because every
+        // prototype-level check looked correct. A config key or constructor
+        // field may never share a name with a remote method.
+        const shadows = [];
+        for (const raw of source.split('\n')) {
+            const line = raw.trim();
+            if (line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) continue;
+            const m = line.match(/this[.]([A-Za-z_$][\w$]*)[ ]*=[ ]/);
+            if (m && remote.has(m[1])) shadows.push(m[1] + ' <- ' + line.slice(0, 60));
+        }
+        eq(shadows, []);
+        return true;
+    });
 }
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
