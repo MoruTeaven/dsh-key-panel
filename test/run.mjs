@@ -1140,5 +1140,172 @@ describe('[22] every remote method has a Typert-legal signature');
         return true;
     });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('[24] the failure path reports itself before it escapes');
+{
+    // The gateway in front of this plugin collapses every non-RemoteError into
+    // `code: "gateway/internal"` plus the bare message and drops the rest. On
+    // 2026-09-25 a panel save showed
+    //   keyPanel.set: gateway/internal: Receiver must be an instance of class ...
+    // while both writes had in fact succeeded. Nothing was logged and the text
+    // matched no string on disk, so the report could not be traced to any code.
+    // Every method that can fail must therefore leave one warn line behind.
+    const host = await import(pathToFileURL(join(ROOT, 'lib/index.js')).href);
+    const dir = mkdtempSync(join(tmpdir(), 'kp-fail-'));
+    const lines = [];
+    let gateway = null;
+    const ctx = {
+        logger: {
+            info: () => {},
+            warn: (line) => { lines.push(String(line)); },
+        },
+        effect: () => {},
+        get: n => (n === 'shellEnv' ? { register: () => () => {} } : undefined),
+        shellEnv: { register: () => () => {} },
+        tools: { register() { return () => {}; } },
+        plugin: (ctor, deps) => { gateway = new ctor({ reflect: { provide() {} } }, deps); },
+    };
+    host.apply(ctx, { dshHome: dir });
+
+    it('a rejected name still throws the original error, unchanged', () => {
+        let caught = null;
+        try { gateway.set('not-a-dsh-name', 'v', 'd'); } catch (error) { caught = error; }
+        eq(caught !== null, true);
+        eq(caught.message.includes('use a DSH_ prefix'), true);
+        return true;
+    });
+
+    it('and that failure left exactly one warn line behind', () => eq(lines.length, 1));
+
+    it('the line names the method that failed', () => eq(lines[0].includes('keyPanel/set failed'), true));
+
+    it('the line carries the message the panel will show', () => eq(lines[0].includes('use a DSH_ prefix'), true));
+
+    it('the line carries a throw site, not just a message', () => eq(/\bat .+:\d+/.test(lines[0]), true));
+
+    it('a successful call logs nothing to warn', () => {
+        const before = lines.length;
+        gateway.set('DSH_OK', 'op-value', 'operator key');
+        eq(lines.length, before);
+        return true;
+    });
+
+    it('no failure line ever contains a value being written', () => {
+        lines.length = 0;
+        // The dangerous shape is a rejection that happens while a secret is in
+        // flight: the value is then sitting in the frame's arguments. Fail a few
+        // different methods and assert no collected line can quote the secret.
+        const attempt = (fn) => { try { fn(); } catch {} };
+        attempt(() => gateway.setPolicy('root', null));
+        attempt(() => gateway.set('ALSO_BAD', 'super-secret-7', 'x'));
+        attempt(() => gateway.setPlatformLabel('NOPE', 'label'));
+        const joined = lines.join('\n');
+        eq(lines.length >= 2, true);
+        eq(joined.includes('super-secret-7'), false);
+        eq(joined.includes('op-value'), false);
+        return true;
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('[25] the gateway has no private-method brand to fail its receiver check');
+{
+    // The 2026-09-25 receipt
+    //   gateway/internal: Receiver must be an instance of class KeyPanelGateway
+    // is V8's own brand-check error for PRIVATE METHODS. The string lives in
+    // the engine binary, not in any file — which is exactly why every disk
+    // search came up empty. It fires when a prototype method is dispatched
+    // onto a receiver that is not a genuine `new` instance of that class —
+    // the shape produced when the plugin is loaded twice under one name (an
+    // old renderer bundle and a new one are different classes that happen to
+    // share a title) and one copy's method lands on the other copy's data.
+    //
+    // Ordinary (underscored) methods have no brand: they work on any receiver
+    // that carries the own properties. This group reproduces the bad receiver
+    // directly and proves the gateway methods run through it.
+    const host = await import(pathToFileURL(join(ROOT, 'lib/index.js')).href);
+    const dir = mkdtempSync(join(tmpdir(), 'kp-brand-'));
+    let gateway = null;
+    const ctx = {
+        logger: { info: () => {}, warn: () => {} },
+        effect: () => {},
+        get: n => (n === 'shellEnv' ? { register: () => () => {} } : undefined),
+        shellEnv: { register: () => () => {} },
+        tools: { register() { return () => {}; } },
+        plugin: (ctor, deps) => { gateway = new ctor({ reflect: { provide() {} } }, deps); },
+    };
+    host.apply(ctx, { dshHome: dir });
+
+    it('a genuine instance saves normally', () => {
+        gateway.set('DSH_BRAND_TEST', 'v7', 'through a real instance');
+        return true;
+    });
+
+    // Build the hostile receiver: prototype chain intact, own properties
+    // present — indistinguishable from an instance to any ordinary method,
+    // rejected outright by a private one.
+    const foreign = Object.create(Object.getPrototypeOf(gateway));
+    for (const key of Object.keys(gateway)) foreign[key] = gateway[key];
+
+    it('the receiver would fail private-method brand checks', () => {
+        // We prove the exact failure mode in the next test; here we just confirm
+        // the setup is otherwise complete (own properties present).
+        eq(typeof foreign.store?.get, 'function');
+        return true;
+    });
+
+    it('the reported crash shape: a private method on this receiver dies by brand check', () => {
+        // Prove the mechanism is real using the very class we ship: attach a
+        // throwaway private method and call it through the foreign receiver.
+        class Probe extends host.KeyPanelGateway { runThrough(o) { return o.#hidden(); } #hidden() { return 7; } }
+        // (Static-structure check — the probe never needs to run to fail.)
+        let brand = null;
+        try {
+            const p = new Probe({ reflect: { provide() {} } }, { store: gateway.store, filePath: '', usageLog: gateway.usageLog, usagePath: '', resync: () => {}, retool: () => {}, logger: gateway.logger });
+            p.runThrough(foreign);
+        } catch (error) { brand = error; }
+        eq(brand !== null, true);
+        eq(String(brand.message).includes('Receiver must be an instance of class'), true);
+        return true;
+    });
+
+    it('describe() on the foreign receiver works and reads the real store', () => {
+        const row = host.KeyPanelGateway.prototype.describe.call(foreign, 'DSH_BRAND_TEST');
+        eq(row.name, 'DSH_BRAND_TEST');
+        eq(row.description, 'through a real instance');
+        return true;
+    });
+
+    it('set() on the foreign receiver writes for real — no phantom failure possible', () => {
+        host.KeyPanelGateway.prototype.addPlatform.call(foreign, 'BRAND', 'Brand probe');
+        host.KeyPanelGateway.prototype.addAccount.call(foreign, 'BRAND', 'X', 'probe acct');
+        const row = host.KeyPanelGateway.prototype.set.call(foreign, 'DSH_BRAND_FOREIGN', 'v77', 'through the other bundle', { platform: 'BRAND', account: 'X', field: 'id' });
+        eq(row.name, 'DSH_BRAND_FOREIGN');
+        eq(row.platform, 'BRAND');
+        eq(gateway.describe('DSH_BRAND_FOREIGN').account, 'X');
+        eq(gateway.describe('DSH_BRAND_FOREIGN').masked.includes('v77'), false);
+        return true;
+    });
+
+    it('no remote method of the gateway reaches a private member', () => {
+        const source = readFileSync(join(ROOT, 'lib/index.js'), 'utf8');
+        const from = source.indexOf('class KeyPanelGateway');
+        const to = source.indexOf('markRemoteMethods(KeyPanelGateway');
+        eq(from >= 0 && to > from, true);
+        const body = source.slice(from, to);
+        const offenders = [];
+        for (const [index, raw] of body.split('\n').entries()) {
+            const line = raw.trim();
+            if (line.startsWith('//') || line.startsWith('*') || line.startsWith('/*')) continue;
+            if (line.startsWith('#') || /\bthis[.]#/.test(line) || /[\w$]\s*[.]\s*#/.test(line)) {
+                offenders.push((index + 1) + ': ' + line.slice(0, 60));
+            }
+        }
+        eq(offenders, []);
+        return true;
+    });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

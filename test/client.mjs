@@ -277,6 +277,44 @@ for (const [label, fn] of [
     });
 }
 
+// ── The exact wording the operator sees ─────────────────────────────────────
+// The panel shows this string verbatim, and it is the only trace a failed call
+// leaves on screen. On 2026-09-25 a save reported
+//   keyPanel.set: gateway/internal: Receiver must be an instance of class ...
+// while the host had in fact stored both values — so the wording has to be
+// pinned, and it has to keep naming the endpoint, the code and the host message
+// in that order. Losing any third of it is how a report becomes untraceable.
+{
+    const ctx = makeCtx(async () => ({ ok: false, error: { code: 'gateway/internal', message: 'boom from the host' } }));
+    registered = null;
+    captured.factory(requireShim).apply(ctx);
+    const api = registered.options.inject();
+    it('a gateway/internal failure renders endpoint, code and message in order', async () => {
+        try {
+            await api.setKey('DSH_X', 'v', 'd');
+        }
+        catch (error) {
+            eq(error.message, 'keyPanel.set: gateway/internal: boom from the host');
+            return true;
+        }
+        throw new Error('did not reject');
+    });
+    it('a failure with no code is still rendered, marked unknown', async () => {
+        const ctx2 = makeCtx(async () => ({ ok: false, error: { message: 'bare' } }));
+        registered = null;
+        captured.factory(requireShim).apply(ctx2);
+        const api2 = registered.options.inject();
+        try {
+            await api2.list();
+        }
+        catch (error) {
+            eq(error.message, 'keyPanel.list: unknown: bare');
+            return true;
+        }
+        throw new Error('did not reject');
+    });
+}
+
 // ── Dictionary completeness: every key used must be defined ─────────────────
 describe('[7] dictionaries');
 {
@@ -780,6 +818,35 @@ describe('[13] filling a key in from the account row');
         await boom.out.modals[0].footer.find(b => b.key === 'save').props.onClick();
         it('a refused write keeps the popup open', () => eq(boom.store[5] !== null, true));
         it('a refused write reports the reason', () => eq(String(boom.store[5].error).includes('host refused'), true));
+    }
+
+    // ── Half a pair: the first write lands, the second does not ────────────
+    // The two writes are deliberately independent calls, so this is reachable:
+    // the account ends up with one slot filled. The reports that matter are that
+    // the successful write really happened (it must not be rolled back or
+    // pretended away), that the popup stays open on the failure, and that the
+    // failure names the endpoint that failed — the second one, not the first.
+    {
+        const calls = [];
+        const half = render({ groups, keys: [] }, {
+            setKey: async (name, value, description, slot) => {
+                calls.push({ name, value, slot });
+                if (name === 'DSH_CF_WORK_KEY') throw new Error('keyPanel.set: gateway/internal: second write refused');
+            },
+        }, { platform: 'CF', identifier: 'WORK', label: 'Work', id: 'acct-123', key: 'tok-456', error: null });
+        await half.out.modals[0].footer.find(b => b.key === 'save').props.onClick();
+        it('the first write reached the host', () => eq(calls.length, 2));
+        it('the first write was the id slot', () => eq(calls[0].name, 'DSH_CF_WORK_ID'));
+        it('the first write is not un-done by the second failing', () => eq(calls[0].value, 'acct-123'));
+        it('the failing write is the second one', () => eq(calls[1].name, 'DSH_CF_WORK_KEY'));
+        it('the popup stays open so the operator sees the half state', () => eq(half.store[5] !== null, true));
+        it('the report names the endpoint that failed', () => eq(String(half.store[5].error).includes('keyPanel.set'), true));
+        it('the report keeps the host code visible', () => eq(String(half.store[5].error).includes('gateway/internal'), true));
+        it('the entered values are left in place for a retry', () => {
+            eq(half.store[5].id, 'acct-123');
+            eq(half.store[5].key, 'tok-456');
+            return true;
+        });
     }
 
     // ── The flat card is NOT removed ───────────────────────────────────────
