@@ -12,6 +12,10 @@
     "key-store"
   ],
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MoruTeaven/dsh-key-panel.git"
+  },
   "type": "module",
   "main": "lib/index.js",
   "exports": {
