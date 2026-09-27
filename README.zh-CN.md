@@ -1,6 +1,6 @@
 # dsh-key-panel
 
-npm 上的 `@moruteaven/dsh-key-panel` · [English](./README.md) · **简体中文** · [日本語](./README.ja.md)
+npm 上的 `@moruteaven/dsh-key-panel` · [English](https://github.com/MoruTeaven/dsh-key-panel/blob/main/README.md) · **简体中文** · [日本語](https://github.com/MoruTeaven/dsh-key-panel/blob/main/README.ja.md)
 
 给 [DSH Desktop](https://deepseek.com) 用的密钥管家。把 API 密钥集中放在一处，
 以 `$DSH_*` 环境变量的形式注入助手的 shell，然后由你在设置页的面板里决定——
@@ -42,7 +42,7 @@ npm 上的 `@moruteaven/dsh-key-panel` · [English](./README.md) · **简体中�
 其它渠道：
 
 - **npm** —— `npm i @moruteaven/dsh-key-panel`，然后在你的 profile 的 `package.json` 里把裸包名 `@moruteaven/dsh-key-panel` 加进 `dsh.profile.bundles`。这个列表**只接受裸包名**，`file:` 或路径会被拒绝（`file:` 放在 `dependencies` 里是合法的）。
-- **从源码** —— 见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+- **从源码** —— 见 [CONTRIBUTING.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/CONTRIBUTING.md)。
 
 ## 使用
 
@@ -200,7 +200,7 @@ version 1 的文件能原样加载：归组字段全是可选的，平台概念�
 ## 安全
 
 **密钥以明文存储。** 这是刻意的取舍，完整说明（信任模型、不变量、非目标）见
-[SECURITY.md](./SECURITY.md)。
+[SECURITY.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/SECURITY.md)。
 
 简要版：
 
@@ -232,7 +232,7 @@ lib/
   client.js   浏览器 bundle —— 设置面板
 ```
 
-本仓库要求遵守的约定、以及怎么跑测试，见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+本仓库要求遵守的约定、以及怎么跑测试，见 [CONTRIBUTING.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/CONTRIBUTING.md)。
 
 ## 兼容性
 
@@ -242,7 +242,7 @@ lib/
 
 ## 许可
 
-[Apache License 2.0](./LICENSE) · 署名信息见 [NOTICE](./NOTICE)
+[Apache License 2.0](https://github.com/MoruTeaven/dsh-key-panel/blob/main/LICENSE) · 署名信息见 [NOTICE](https://github.com/MoruTeaven/dsh-key-panel/blob/main/NOTICE)
 
 选 Apache-2.0 而不是 MIT/BSD，是因为它对**处理凭据**的工具多了两条有意义的条款：
 

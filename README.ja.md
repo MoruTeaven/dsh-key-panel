@@ -1,6 +1,6 @@
 # dsh-key-panel
 
-npm では `@moruteaven/dsh-key-panel` · [English](./README.md) · [简体中文](./README.zh-CN.md) · **日本語**
+npm では `@moruteaven/dsh-key-panel` · [English](https://github.com/MoruTeaven/dsh-key-panel/blob/main/README.md) · [简体中文](https://github.com/MoruTeaven/dsh-key-panel/blob/main/README.zh-CN.md) · **日本語**
 
 [DSH Desktop](https://deepseek.com) 用のシークレット管理プラグインです。API
 キーを一か所にまとめ、アシスタントのシェルに `$DSH_*` 環境変数として注入し、
@@ -54,7 +54,7 @@ npm では `@moruteaven/dsh-key-panel` · [English](./README.md) · [简体中�
   `package.json` にある `dsh.profile.bundles` に裸のパッケージ名
   `@moruteaven/dsh-key-panel` を追加します。このリストは**裸のパッケージ名のみ**を
   受け付け、`file:` やパス指定は拒否されます（`file:` は `dependencies` では有効です）。
-- **ソースから** —— [CONTRIBUTING.md](./CONTRIBUTING.md) を参照。
+- **ソースから** —— [CONTRIBUTING.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/CONTRIBUTING.md) を参照。
 
 ## 使い方
 
@@ -237,7 +237,7 @@ version 1 のファイルはそのまま読み込めます。分類フィール�
 ## セキュリティ
 
 **値は平文で保存されます。** これは意図的なトレードオフです。信頼モデル・不変条件・
-非目標を含む詳細は [SECURITY.md](./SECURITY.md) を参照してください。
+非目標を含む詳細は [SECURITY.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/SECURITY.md) を参照してください。
 
 要点：
 
@@ -271,7 +271,7 @@ lib/
 ```
 
 このリポジトリが求める規約とテストの実行方法は
-[CONTRIBUTING.md](./CONTRIBUTING.md) にあります。
+[CONTRIBUTING.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/CONTRIBUTING.md) にあります。
 
 ## 互換性
 
@@ -281,7 +281,7 @@ lib/
 
 ## ライセンス
 
-[Apache License 2.0](./LICENSE) · 帰属表示は [NOTICE](./NOTICE)
+[Apache License 2.0](https://github.com/MoruTeaven/dsh-key-panel/blob/main/LICENSE) · 帰属表示は [NOTICE](https://github.com/MoruTeaven/dsh-key-panel/blob/main/NOTICE)
 
 資格情報を扱うツールであるため、MIT/BSD ではなく Apache-2.0 を選びました。
 意味のある条項が 2 つ増えるためです：

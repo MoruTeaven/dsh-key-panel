@@ -1,6 +1,6 @@
 # dsh-key-panel
 
-`@moruteaven/dsh-key-panel` on npm · **English** · [简体中文](./README.zh-CN.md) · [日本語](./README.ja.md)
+`@moruteaven/dsh-key-panel` on npm · **English** · [简体中文](https://github.com/MoruTeaven/dsh-key-panel/blob/main/README.zh-CN.md) · [日本語](https://github.com/MoruTeaven/dsh-key-panel/blob/main/README.ja.md)
 
 A secret store for [DSH Desktop](https://deepseek.com). Keep API keys in one
 place, have them injected into the assistant's shell as `$DSH_*` variables, and
@@ -61,7 +61,7 @@ Other channels:
   `@moruteaven/dsh-key-panel` to `dsh.profile.bundles` in your profile's
   `package.json`. The bundles list takes **bare package names only**; a `file:`
   or path spec is rejected there (`file:` is fine in `dependencies`).
-- **From source** — see [CONTRIBUTING.md](./CONTRIBUTING.md).
+- **From source** — see [CONTRIBUTING.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/CONTRIBUTING.md).
 
 ## Usage
 
@@ -272,7 +272,7 @@ The plugin never joins them.
 ## Security
 
 **Values are stored in plaintext.** This is deliberate and explained in full in
-[SECURITY.md](./SECURITY.md), along with the trust model, the invariants, and the
+[SECURITY.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/SECURITY.md), along with the trust model, the invariants, and the
 non-goals.
 
 The short version:
@@ -308,7 +308,7 @@ lib/
   client.js   browser bundle — settings panel
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the conventions this repo enforces
+See [CONTRIBUTING.md](https://github.com/MoruTeaven/dsh-key-panel/blob/main/CONTRIBUTING.md) for the conventions this repo enforces
 and how to run the suites.
 
 ## Compatibility
@@ -319,7 +319,7 @@ and how to run the suites.
 
 ## License
 
-[Apache License 2.0](./LICENSE) · attribution in [NOTICE](./NOTICE)
+[Apache License 2.0](https://github.com/MoruTeaven/dsh-key-panel/blob/main/LICENSE) · attribution in [NOTICE](https://github.com/MoruTeaven/dsh-key-panel/blob/main/NOTICE)
 
 Apache-2.0 was chosen over MIT/BSD for this project because it adds two clauses
 that matter for a tool handling credentials:

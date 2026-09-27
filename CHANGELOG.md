@@ -2,6 +2,10 @@
 
 本文件记录 dsh-key-panel 的用户可见变更。版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.0.2-dev.1 — 2026-09-27
+
+- 修复 npm 包页面上 README 内链接（语言切换、贡献与安全指南等）点击 404 的问题。
+
 ## 1.0.1 — 2026-09-27
 
 - 修复设置面板中「显示」「保存」等操作偶发弹出 "Receiver must be an instance of class KeyPanelGateway" 报错的问题——操作实际已生效，报错为误报，现已消除。
