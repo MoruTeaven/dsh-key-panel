@@ -22,11 +22,14 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      # The suites are deliberately dependency-free: lib/policy.js and
-      # lib/store.js import nothing but node: builtins, and test/client.mjs
-      # loads the browser bundle against a stubbed loader. No npm install is
-      # needed, which also means these tests cannot be broken by a peer-
-      # dependency drift in a host app that CI does not have.
+      # The pure core is dependency-free, but the host suite loads
+      # lib/tools.js, which imports @deepseek-ai/dsh-tools — a fresh checkout
+      # cannot run without its peerDependencies. Plain `npm install` resolves
+      # them to the public range package.json declares, so CI also catches
+      # peer drift against what a real user can install.
+      - name: Install peer dependencies
+        run: npm install --no-audit --no-fund
+
       - name: Host suite (policy, store, tools, gateway)
         run: node test/run.mjs
 
