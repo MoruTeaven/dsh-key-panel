@@ -2,6 +2,10 @@
 
 本文件记录 dsh-key-panel 的用户可见变更。版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.0.2-dev.4 — 2026-10-07
+
+- 修复更新到 DeepSeek Harness 最新版后，密钥设置面板显示空白的问题。
+
 ## 1.0.2-dev.3 — 2026-10-06
 
 - 修复更新到 DeepSeek Harness 最新版后，密钥设置面板显示空白的问题。
