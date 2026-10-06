@@ -1,6 +1,6 @@
 {
   "name": "@moruteaven/dsh-key-panel",
-  "version": "1.0.2-dev.2",
+  "version": "1.0.2-dev.3",
   "description": "Managed secret store for DSH Desktop. Operator-owned keys, injected into the assistant's shell as $DSH_* variables, with a settings-page panel and three operator-controlled access modes.",
   "keywords": [
     "dsh",

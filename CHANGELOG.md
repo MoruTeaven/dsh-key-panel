@@ -2,6 +2,10 @@
 
 本文件记录 dsh-key-panel 的用户可见变更。版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## 1.0.2-dev.3 — 2026-10-06
+
+- 修复更新到 DeepSeek Harness 最新版后，密钥设置面板显示空白的问题。
+
 ## 1.0.2-dev.2 — 2026-09-27
 
 - 助手启动时即知晓密钥面板及其用法（`$DSH_*` 引用方式、三种访问模式、值不外泄），无需先调用工具。

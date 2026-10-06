@@ -875,40 +875,69 @@ describe('[12] every primitive the bundle destructures actually exists');
 //
 // The list below is the host's real export surface (icons + the handful of
 // components the bundle uses), captured from
-// @deepseek-ai/dsh-client-ui-primitives 0.1.5-rc.2. It is public API, so it
+// @deepseek-ai/dsh-client-ui-primitives 0.2.0-rc.2. It is public API, so it
 // belongs in this repo. When the host adds icons this only ever grows — a name
 // leaving the list would be a breaking host change worth noticing.
 {
     const KNOWN_PRIMITIVES = new Set([
         // components / helpers
         'Button', 'Input', 'Tag', 'StateDot', 'Modal', 'Toast', 'writeClipboard',
-        // icons
-        'IconAgentPresetOutline16', 'IconAlarmClockOutline16', 'IconApiOutline14',
-        'IconArchiveOutline20', 'IconBranchOutline16', 'IconBrowseOutline16',
-        'IconCheckOutline14', 'IconCheckOutline16', 'IconChecklistOutline14',
-        'IconChevronDownOutline14', 'IconChevronLeftOutline14',
-        'IconChevronRightOutline14', 'IconChevronUpOutline14',
-        'IconClockOutline16', 'IconCloseFill14', 'IconCloseOutline16',
-        'IconCodeOutline16', 'IconContextInjectionOutline16', 'IconCopyOutline16',
-        'IconCordisPluginOutline14', 'IconDarkOutline16', 'IconDataOutline16',
-        'IconDatabaseOutline16', 'IconDislikeFill16', 'IconDislikeOutline16',
-        'IconDownloadOutline16', 'IconEditOutline16', 'IconEllipsisOutline16',
-        'IconEnhanceOutline16', 'IconFolderClose16', 'IconFolderOpen16',
-        'IconFolderOpenOutline16', 'IconFollowsystemOutline16',
-        'IconFullscreenOutline16', 'IconGaugeOutline16', 'IconGlobeOutline14',
-        'IconGoalOutline16', 'IconInspectOutline12', 'IconLightOutline16',
-        'IconLikeFill16', 'IconLikeOutline16', 'IconLinkOutline14',
-        'IconLinkOutline16', 'IconListPenOutline16', 'IconLoadingOutline16',
-        'IconNewChatOutline16', 'IconPanelLeftOutline16', 'IconPaperclipOutline16',
-        'IconPauseOutline16', 'IconPersonalizationOutline16', 'IconPlayOutline16',
-        'IconPlusOutline16', 'IconProjectAddOutline16', 'IconQuestionOutline14',
-        'IconQueueOutline14', 'IconRefreshOutline14', 'IconRefreshOutline16',
-        'IconRightUpOutline14', 'IconRightUpOutline16', 'IconSearchOutline16',
-        'IconSendOutline14', 'IconSendOutline16', 'IconSettingsOutline14',
-        'IconSettingsOutline16', 'IconShareOutline16', 'IconSkillOutline16',
-        'IconSparkle16', 'IconStopFill16', 'IconThinkOutline14',
-        'IconThinkOutline16', 'IconTrashOutline16', 'IconTreeCorner8x10',
-        'IconTriangleRightFill14', 'IconUserOutline16', 'IconWarningOutline16',
+        // icons — @deepseek-ai/dsh-client-ui-primitives 0.2.0-rc.2 dropped the
+        // pixel-size suffix (IconCloseOutline16 -> IconCloseOutline, with
+        // Regular/Medium/Artwork variants and a size prop), so the list below
+        // is regenerated from that version's real export surface.
+        'IconAgentPresetOutline', 'IconAgentPresetOutlineArtwork', 'IconAgentPresetOutlineMedium', 'IconAgentPresetOutlineRegular', 'IconAlarmClockOutline', 'IconAlarmClockOutlineArtwork',
+        'IconAlarmClockOutlineMedium', 'IconAlarmClockOutlineRegular', 'IconApiOutline', 'IconApiOutlineArtwork', 'IconApiOutlineMedium', 'IconApiOutlineRegular',
+        'IconArchiveCheckOutline', 'IconArchiveCheckOutlineArtwork', 'IconArchiveCheckOutlineMedium', 'IconArchiveCheckOutlineRegular', 'IconArchiveOffOutline', 'IconArchiveOffOutlineArtwork',
+        'IconArchiveOffOutlineMedium', 'IconArchiveOffOutlineRegular', 'IconArchiveOutline', 'IconArchiveOutlineArtwork', 'IconArchiveOutlineMedium', 'IconArchiveOutlineRegular',
+        'IconBranchOutline', 'IconBranchOutlineArtwork', 'IconBranchOutlineMedium', 'IconBranchOutlineRegular', 'IconBrowseOutline', 'IconBrowseOutlineMedium',
+        'IconBrowseOutlineRegular', 'IconCheckCircleOutline', 'IconCheckCircleOutlineArtwork', 'IconCheckCircleOutlineMedium', 'IconCheckCircleOutlineRegular', 'IconCheckOutline',
+        'IconCheckOutlineArtwork', 'IconCheckOutlineMedium', 'IconCheckOutlineRegular', 'IconChecklistOutline', 'IconChecklistOutlineArtwork', 'IconChecklistOutlineMedium',
+        'IconChecklistOutlineRegular', 'IconChevronDownOutline', 'IconChevronDownOutlineArtwork', 'IconChevronDownOutlineMedium', 'IconChevronDownOutlineRegular', 'IconChevronLeftOutline',
+        'IconChevronLeftOutlineArtwork', 'IconChevronLeftOutlineMedium', 'IconChevronLeftOutlineRegular', 'IconChevronRightOutline', 'IconChevronRightOutlineArtwork', 'IconChevronRightOutlineMedium',
+        'IconChevronRightOutlineRegular', 'IconChevronUpOutline', 'IconChevronUpOutlineArtwork', 'IconChevronUpOutlineMedium', 'IconChevronUpOutlineRegular', 'IconChevronsUpDownOutline',
+        'IconChevronsUpDownOutlineArtwork', 'IconChevronsUpDownOutlineMedium', 'IconChevronsUpDownOutlineRegular', 'IconClockOutline', 'IconClockOutlineArtwork', 'IconClockOutlineMedium',
+        'IconClockOutlineRegular', 'IconCloseOutline', 'IconCloseOutlineArtwork', 'IconCloseOutlineMedium', 'IconCloseOutlineRegular', 'IconCodeOutline',
+        'IconCodeOutlineArtwork', 'IconCodeOutlineMedium', 'IconCodeOutlineRegular', 'IconCompactOutline', 'IconCompactOutlineArtwork', 'IconCompactOutlineMedium',
+        'IconCompactOutlineRegular', 'IconCompareSplitOutline', 'IconCompareSplitOutlineArtwork', 'IconCompareSplitOutlineMedium', 'IconCompareSplitOutlineRegular', 'IconContextInjectionOutline',
+        'IconContextInjectionOutlineArtwork', 'IconContextInjectionOutlineMedium', 'IconContextInjectionOutlineRegular', 'IconCopyOutline', 'IconCopyOutlineArtwork', 'IconCopyOutlineMedium',
+        'IconCopyOutlineRegular', 'IconCordisPluginOutline', 'IconCordisPluginOutlineArtwork', 'IconCordisPluginOutlineMedium', 'IconCordisPluginOutlineRegular', 'IconDarkOutline',
+        'IconDarkOutlineArtwork', 'IconDarkOutlineMedium', 'IconDarkOutlineRegular', 'IconDataOutline', 'IconDataOutlineArtwork', 'IconDataOutlineMedium',
+        'IconDataOutlineRegular', 'IconDatabaseOutline', 'IconDatabaseOutlineArtwork', 'IconDatabaseOutlineMedium', 'IconDatabaseOutlineRegular', 'IconDislikeOutline',
+        'IconDislikeOutlineArtwork', 'IconDislikeOutlineMedium', 'IconDislikeOutlineRegular', 'IconDownloadOutline', 'IconDownloadOutlineArtwork', 'IconDownloadOutlineMedium',
+        'IconDownloadOutlineRegular', 'IconEditOutline', 'IconEditOutlineArtwork', 'IconEditOutlineMedium', 'IconEditOutlineRegular', 'IconEllipsisOutline',
+        'IconEllipsisOutlineArtwork', 'IconEllipsisOutlineMedium', 'IconEllipsisOutlineRegular', 'IconEnhanceOutline', 'IconEnhanceOutlineArtwork', 'IconEnhanceOutlineMedium',
+        'IconEnhanceOutlineRegular', 'IconFlatListOutline', 'IconFlatListOutlineArtwork', 'IconFlatListOutlineMedium', 'IconFlatListOutlineRegular', 'IconFolderOpenOutline',
+        'IconFolderOpenOutlineArtwork', 'IconFolderOpenOutlineMedium', 'IconFolderOpenOutlineRegular', 'IconFollowsystemOutline', 'IconFollowsystemOutlineArtwork', 'IconFollowsystemOutlineMedium',
+        'IconFollowsystemOutlineRegular', 'IconFullscreenOutline', 'IconFullscreenOutlineArtwork', 'IconFullscreenOutlineMedium', 'IconFullscreenOutlineRegular', 'IconGaugeOutline',
+        'IconGaugeOutlineArtwork', 'IconGaugeOutlineMedium', 'IconGaugeOutlineRegular', 'IconGlobeOutline', 'IconGlobeOutlineMedium', 'IconGlobeOutlineRegular',
+        'IconGoalOutline', 'IconGoalOutlineArtwork', 'IconGoalOutlineMedium', 'IconGoalOutlineRegular', 'IconInfoOutline', 'IconInfoOutlineArtwork',
+        'IconInfoOutlineMedium', 'IconInfoOutlineRegular', 'IconInspectOutline', 'IconInspectOutlineMedium', 'IconInspectOutlineRegular', 'IconLightOutline',
+        'IconLightOutlineArtwork', 'IconLightOutlineMedium', 'IconLightOutlineRegular', 'IconLikeOutline', 'IconLikeOutlineArtwork', 'IconLikeOutlineMedium',
+        'IconLikeOutlineRegular', 'IconLinkOutline', 'IconLinkOutlineArtwork', 'IconLinkOutlineMedium', 'IconLinkOutlineRegular', 'IconListPenOutline',
+        'IconListPenOutlineArtwork', 'IconListPenOutlineMedium', 'IconListPenOutlineRegular', 'IconLoadingOutline', 'IconLoadingOutlineArtwork', 'IconLoadingOutlineMedium',
+        'IconLoadingOutlineRegular', 'IconMicrophoneOutlineArtwork', 'IconMicrophoneOutlineMedium', 'IconMicrophoneOutlineRegular', 'IconNewChatOutline', 'IconNewChatOutlineMedium',
+        'IconNewChatOutlineRegular', 'IconPanelLeftOutline', 'IconPanelLeftOutlineArtwork', 'IconPanelLeftOutlineMedium', 'IconPanelLeftOutlineRegular', 'IconPaperPlaneOutline',
+        'IconPaperPlaneOutlineArtwork', 'IconPaperPlaneOutlineMedium', 'IconPaperPlaneOutlineRegular', 'IconPaperclipOutline', 'IconPaperclipOutlineArtwork', 'IconPaperclipOutlineMedium',
+        'IconPaperclipOutlineRegular', 'IconPauseOutline', 'IconPauseOutlineArtwork', 'IconPauseOutlineMedium', 'IconPauseOutlineRegular', 'IconPersonalizationOutline',
+        'IconPersonalizationOutlineArtwork', 'IconPersonalizationOutlineMedium', 'IconPersonalizationOutlineRegular', 'IconPinOutline', 'IconPinOutlineArtwork', 'IconPinOutlineMedium',
+        'IconPinOutlineRegular', 'IconPlanOutline', 'IconPlanOutlineArtwork', 'IconPlanOutlineMedium', 'IconPlanOutlineRegular', 'IconPlayOutline',
+        'IconPlayOutlineArtwork', 'IconPlayOutlineMedium', 'IconPlayOutlineRegular', 'IconPluginPinwheelOutlineArtwork', 'IconPluginPinwheelOutlineMedium', 'IconPluginPinwheelOutlineRegular',
+        'IconPlusOutline', 'IconPlusOutlineArtwork', 'IconPlusOutlineMedium', 'IconPlusOutlineRegular', 'IconProjectAddOutline', 'IconProjectAddOutlineArtwork',
+        'IconProjectAddOutlineMedium', 'IconProjectAddOutlineRegular', 'IconQuestionOutline', 'IconQuestionOutlineArtwork', 'IconQuestionOutlineMedium', 'IconQuestionOutlineRegular',
+        'IconQueueOutline', 'IconQueueOutlineArtwork', 'IconQueueOutlineMedium', 'IconQueueOutlineRegular', 'IconRefreshOutline', 'IconRefreshOutlineArtwork',
+        'IconRefreshOutlineMedium', 'IconRefreshOutlineRegular', 'IconRightUpOutline', 'IconRightUpOutlineArtwork', 'IconRightUpOutlineMedium', 'IconRightUpOutlineRegular',
+        'IconSearchOutline', 'IconSearchOutlineArtwork', 'IconSearchOutlineMedium', 'IconSearchOutlineRegular', 'IconSendOutline', 'IconSendOutlineArtwork',
+        'IconSendOutlineMedium', 'IconSendOutlineRegular', 'IconSettingsOutline', 'IconSettingsOutlineArtwork', 'IconSettingsOutlineMedium', 'IconSettingsOutlineRegular',
+        'IconShareOutline', 'IconShareOutlineArtwork', 'IconShareOutlineMedium', 'IconShareOutlineRegular', 'IconShieldOutline', 'IconShieldOutlineArtwork',
+        'IconShieldOutlineMedium', 'IconShieldOutlineRegular', 'IconSkillOutline', 'IconSkillOutlineArtwork', 'IconSkillOutlineMedium', 'IconSkillOutlineRegular',
+        'IconSlidersTwoOutline', 'IconSlidersTwoOutlineArtwork', 'IconSlidersTwoOutlineMedium', 'IconSlidersTwoOutlineRegular', 'IconThinkOutline', 'IconThinkOutlineArtwork',
+        'IconThinkOutlineMedium', 'IconThinkOutlineRegular', 'IconTrashOutline', 'IconTrashOutlineArtwork', 'IconTrashOutlineMedium', 'IconTrashOutlineRegular',
+        'IconUnarchiveOutline', 'IconUnarchiveOutlineArtwork', 'IconUnarchiveOutlineMedium', 'IconUnarchiveOutlineRegular', 'IconUserOutline', 'IconUserOutlineArtwork',
+        'IconUserOutlineMedium', 'IconUserOutlineRegular', 'IconUsersOutline', 'IconUsersOutlineArtwork', 'IconUsersOutlineMedium', 'IconUsersOutlineRegular',
+        'IconWarningOutline', 'IconWarningOutlineArtwork', 'IconWarningOutlineMedium', 'IconWarningOutlineRegular', 'IconWarningTriangleOutlineArtwork', 'IconWarningTriangleOutlineMedium',
+        'IconWarningTriangleOutlineRegular', 'IconWorkspaceTreeOutline', 'IconWorkspaceTreeOutlineArtwork', 'IconWorkspaceTreeOutlineMedium', 'IconWorkspaceTreeOutlineRegular', 'IconWrapLinesOutline',
+        'IconWrapLinesOutlineArtwork', 'IconWrapLinesOutlineMedium', 'IconWrapLinesOutlineRegular',
     ]);
 
     // Pull the destructure list straight out of the bundle so this cannot drift:
