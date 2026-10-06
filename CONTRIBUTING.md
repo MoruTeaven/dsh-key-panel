@@ -102,6 +102,50 @@ name**, and the profile must list it in `dsh.profile.bundles`.
   "
   ```
 
+## Release channels
+
+Which registry a publish lands on is decided by `~/.npmrc`, not by the shell
+the panel injects into.
+
+- **Private (Codeup) is the default.** `@moruteaven` is bound there, so a bare
+  `npm publish` authenticates with that file's own `_authToken`; the injected
+  `$DSH_NPM_*` value takes no part in it. A dry run states the target outright:
+
+  ```bash
+  npm publish --dry-run
+  # npm notice Publishing to https://packages.aliyun.com/<org>/npm/dsh-key-panel/ …
+  ```
+
+- **Public (npmjs) needs the scope overridden.** The binding outranks both
+  `--registry` and `NPM_CONFIG_REGISTRY` — either one alone is silently
+  ignored for this scoped package and the publish still goes to Codeup — so
+  override the scope itself, and ask for `public` because a scoped package
+  defaults to `restricted`:
+
+  ```bash
+  npm publish --@moruteaven:registry=https://registry.npmjs.org/ --access public
+  ```
+
+  The same override also works as an environment variable
+  (`NPM_CONFIG_@MORUTEAVEN:REGISTRY=…`), which is what makes it scriptable.
+  Prereleases on the private channel go out with `--tag dev` (snapshot at
+  1.0.2-dev.2: `latest=1.0.1`, `dev=1.0.2-dev.2`); keep the public one in step.
+
+### A 403 means the wrong credential, not a lost value
+
+An npmjs PAT aimed at Codeup answers 403 even when `shellEnv` delivered the
+value byte-perfectly — that is an identity mismatch, not an injection failure.
+Check who the credential belongs to (`npm whoami --registry=…`) before
+suspecting the shell. The panel stays registry-agnostic by design (see
+`SECURITY.md`); the practical rule is one key per registry under a name that
+says which (`$DSH_NPM_NPMJS_KEY` vs `$DSH_NPM_CODEUP_KEY`). npm never reads
+`$DSH_*` on its own — bridge an injected value into a config npm does read
+(`--userconfig` pointing at a scratch file outside the repo), and never pass
+`--_authToken=` on a command line, where the value lands in the process list
+and shell history.
+
+Only formal versions reach the public channel; `-dev` builds stay private.
+
 ## Done means
 
 - `npm test` green — both suites.

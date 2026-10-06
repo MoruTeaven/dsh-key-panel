@@ -39,7 +39,10 @@ test/
 - `SECURITY.md` — trust model, invariants, non-goals. Read it before changing
   anything about how values move.
 - `CONTRIBUTING.md` — conventions, how to run the suites, how to install from
-  source, what "done" means.
+  source, what "done" means. Its **Release channels** section is required
+  reading before any publish: a bare `npm publish` goes to the private Codeup
+  repo, and a 403 from it means the wrong credential, not a value that failed
+  to arrive.
 
 ## Open items
 
