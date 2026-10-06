@@ -128,8 +128,11 @@ the panel injects into.
 
   The same override also works as an environment variable
   (`NPM_CONFIG_@MORUTEAVEN:REGISTRY=…`), which is what makes it scriptable.
-  Prereleases on the private channel go out with `--tag dev` (snapshot at
-  1.0.2-dev.2: `latest=1.0.1`, `dev=1.0.2-dev.2`); keep the public one in step.
+
+  Prereleases are private-only: they go to Codeup under `--tag dev` (snapshot
+  at 1.0.2-dev.2: `latest=1.0.1`, `dev=1.0.2-dev.2`), and never to npmjs. The
+  public channel carries formal versions and nothing else — reaching for the
+  scope override above is how a release crosses that line, so don't.
 
 ### A 403 means the wrong credential, not a lost value
 
