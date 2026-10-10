@@ -27,6 +27,13 @@ passes; see below.
   gate** (`readonly` registers none: the capability is absent, not refused), and
   the policy is re-read at call time via `livePolicy()`, never from a captured
   copy.
+- `lib/mcp-resources.js` — the read-only discovery surface. Built entirely on
+  `store.metadata()`, which has no value field: that is what makes "no value
+  crosses this boundary" structural instead of a promise. Reached through
+  `ctx.inject(['mcpResources'], …)`, never the `inject` array, so a composition
+  without the MCP resource package degrades to a no-op rather than a load
+  failure. The callback fires asynchronously — do not read its state from
+  `apply()`.
 - `lib/index.js` — the host's face. A new gateway method stays unreachable until
   its name is appended to the `markRemoteMethods(KeyPanelGateway, [...])` list
   that sits just above `apply()`; the omission is silent.

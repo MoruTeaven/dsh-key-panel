@@ -44,6 +44,11 @@ Assistant needs to deploy a Worker
   panel field is hidden in this release.
 - **Two-phase deletion.** Deleting needs a second, confirmed call with a
   short-lived token — a single stray tool call cannot remove a key.
+- **Read-only catalogue.** The assistant can look up every key's name and purpose
+  directly, instead of inferring them from the environment. The catalogue returns
+  names and purposes only — **never a value** — and is available in all three
+  access modes. Where the host has no MCP resource support, it simply does not
+  exist, and nothing else changes.
 - **Values never reach the model.** No tool returns a key value, in any mode.
 - **Idempotent, hot-reload safe.** The panel re-reads policy on every call.
 
@@ -287,9 +292,9 @@ The short version:
 ## Development
 
 ```bash
-npm test            # both suites — 427 assertions
-npm run test:host   # host half: policy, store, tools, gateway (298)
-npm run test:client # client bundle: contract, slots, RPC, dictionaries (129)
+npm test            # both suites — 480 assertions
+npm run test:host   # host half: policy, store, tools, gateway, MCP resources (335)
+npm run test:client # client bundle: contract, slots, RPC, dictionaries (145)
 ```
 
 The client suite loads `lib/client.js` the way the real frontend does — a fake

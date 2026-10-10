@@ -71,6 +71,46 @@ absence does not. An argument about permissions is a thing a model can be talked
 out of, and a tool that exists is a tool that can be mis-invoked. There is no
 prompt that reveals a capability that was never registered.
 
+### What the model can learn about your keys, in every mode
+
+`readonly` bounds what the model can *change*. It does not, and cannot, hide
+which keys *exist*:
+
+- A key must be present in the shell environment to be usable, and the model is
+  the one running commands, so `env | grep DSH_` already reveals every name.
+- The MCP resource surface (below) additionally reveals each name's
+  **description** and grouping.
+
+Names and descriptions are treated as non-secret by design; only **values** are
+secret, and values never leave the host except through the shell channel. If the
+existence or purpose of a key is itself sensitive, do not store it here.
+
+### The MCP resource surface (read-only discovery)
+
+When the host composition loads `@deepseek-ai/dsh-mcp-resources`, the plugin
+publishes one MCP resource server named `key-panel`. The host advertises that
+name in its own system-prompt section and owns the three query tools
+(`list_mcp_resources`, `list_mcp_resource_templates`, `read_mcp_resource`), so
+this plugin implements no tools of its own for it.
+
+**The one invariant, and how it is held.** No resource payload may carry a value.
+This is enforced structurally rather than by discipline: every payload is built
+from `store.metadata()`, a projection with no value field at all, so a later edit
+has nothing to forget to strip. `lib/mcp-resources.js` never calls `store.list()`
+or `store.values()`, and both the suite and a source scan assert that.
+
+The surface is **global, not per-agent**: registration happens on the plugin's
+own context, so every agent scope sees it — the same reach as the shell
+environment channel that already carries these keys, and consistent with the
+store being per-`DSH_HOME` with no per-user isolation. Scoping it more narrowly
+than the shell channel would be a fiction, not a boundary.
+
+Because the server name is published by the host rather than by this plugin, a
+composition without the MCP resource package simply has no such surface. The
+dependency is optional on purpose: listing `mcpResources` in this plugin's
+`inject` array would make key-panel fail to load wherever that package is
+absent, and a throw in `apply()` takes down the whole plugin tree.
+
 ### Provenance, and what it does and does not prevent
 
 Each key records who created it:
@@ -134,7 +174,8 @@ These are asserted by the test suite (`node test/run.mjs`):
 
 1. **No tool ever returns a key value.** Tools return names, descriptions and
    status only. The value's only route to the assistant is the shell environment,
-   referenced as `$NAME` — it never enters the conversation transcript.
+   referenced as `$NAME` — it never enters the conversation transcript. The MCP
+   resource surface obeys the same rule and is built on a value-free projection.
 2. **Deletion is two-phase.** The first call mints a random token and changes
    nothing; removal requires a second call carrying that exact token. Tokens are
    held in memory only — a restart invalidates every outstanding one — expire

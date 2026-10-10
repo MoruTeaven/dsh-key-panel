@@ -15,6 +15,7 @@ const lib = name => import(pathToFileURL(join(ROOT, 'lib', name)).href).then(m =
 const { KeyStore, keyStorePath, isValidKeyName, ORIGIN_MODEL, ORIGIN_OPERATOR, STORE_VERSION, isValidIdentifier, isValidField, accountKey, credentialName, normalisePlatforms, normaliseAccounts, FIELD_ID, FIELD_KEY } = await import(pathToFileURL(join(ROOT, 'lib/store.js')).href);
 const policy = await import(pathToFileURL(join(ROOT, 'lib/policy.js')).href);
 const { ConfirmationLedger } = await import(pathToFileURL(join(ROOT, 'lib/tools.js')).href);
+const mcpResources = await import(pathToFileURL(join(ROOT, 'lib/mcp-resources.js')).href);
 const usageModuleUrl = pathToFileURL(join(ROOT, 'lib/usage.js')).href;
 const indexModuleUrl = pathToFileURL(join(ROOT, 'lib/index.js')).href;
 
@@ -28,6 +29,26 @@ const describe = name => { group = name; console.log(`\n${name}`); };
 const it = (label, fn) => {
     try {
         const result = fn();
+        if (result === false) throw new Error('returned false');
+        passed += 1;
+        console.log(`  ✓ ${label}`);
+    }
+    catch (error) {
+        failed += 1;
+        console.log(`  ✗ ${label} — ${error?.message ?? error}`);
+    }
+};
+
+/**
+ * Async twin of `it`.
+ *
+ * `it` ignores a returned promise, so an `async` callback would register as a
+ * PASS the moment it hits its first await — a test that can never fail. Any
+ * case that needs to await must go through this, which is awaited in turn.
+ */
+const itAsync = async (label, fn) => {
+    try {
+        const result = await fn();
         if (result === false) throw new Error('returned false');
         passed += 1;
         console.log(`  ✓ ${label}`);
@@ -1307,5 +1328,274 @@ describe('[25] the gateway has no private-method brand to fail its receiver chec
     });
 }
 
+describe('[26] MCP resource surface: metadata only, never a value');
+{
+    const dir = mkdtempSync(join(tmpdir(), 'kp-mcp-'));
+    const store = new KeyStore(keyStorePath(dir));
+
+    // A sentinel that cannot occur by accident. Every assertion below looks for
+    // this exact string in what the provider hands back.
+    const SENTINEL = 'sk-SENTINEL-7c4f9a2e-must-never-surface';
+    store.set('DSH_CF_TOKEN', SENTINEL, 'Cloudflare API token');
+    store.set('DSH_NPM_TOKEN', 'npm-OTHER-sentinel-9d31', 'npm publish token');
+
+    const provider = mcpResources.createResourceProvider({ store });
+    const list = await provider.request({ method: 'resources/list' });
+
+    it('metadata() carries no value field at all', () => {
+        const meta = store.metadata();
+        eq(meta.length, 2);
+        for (const entry of meta) eq(Object.hasOwn(entry, 'value'), false);
+        return true;
+    });
+    it('metadata() still carries the names and descriptions', () => {
+        const meta = store.metadata();
+        eq(meta.map(m => m.name), ['DSH_CF_TOKEN', 'DSH_NPM_TOKEN']);
+        eq(meta[0].description, 'Cloudflare API token');
+        return true;
+    });
+    it('list advertises an index resource plus one per key', () => {
+        eq(list.resources.length, 3);
+        eq(list.resources[0].uri, 'key-panel://keys');
+        eq(list.resources[1].uri, 'key-panel://keys/DSH_CF_TOKEN');
+        eq(list.resources[2].uri, 'key-panel://keys/DSH_NPM_TOKEN');
+        return true;
+    });
+    await itAsync('templates are empty: this server mints literal URIs', async () => {
+        const result = await provider.request({ method: 'resources/templates/list' });
+        eq(result.resourceTemplates, []);
+        return true;
+    });
+    await itAsync('reading the index returns every key', async () => {
+        const result = await provider.request({ method: 'resources/read', uri: 'key-panel://keys' });
+        const body = JSON.parse(result.contents[0].text);
+        eq(body.count, 2);
+        eq(body.keys.length, 2);
+        eq(body.keys[0].name, 'DSH_CF_TOKEN');
+        return true;
+    });
+    await itAsync('reading one key returns exactly that key', async () => {
+        const result = await provider.request({ method: 'resources/read', uri: 'key-panel://keys/DSH_NPM_TOKEN' });
+        const body = JSON.parse(result.contents[0].text);
+        eq(body.key.name, 'DSH_NPM_TOKEN');
+        eq(Object.hasOwn(body, 'keys'), false);
+        return true;
+    });
+
+    // The invariant this whole module exists to hold.
+    await itAsync('NO response from any method contains a stored value', async () => {
+        const payloads = [];
+        for (const request of [
+            { method: 'resources/list' },
+            { method: 'resources/templates/list' },
+            { method: 'resources/read', uri: 'key-panel://keys' },
+            { method: 'resources/read', uri: 'key-panel://keys/DSH_CF_TOKEN' },
+            { method: 'resources/read', uri: 'key-panel://keys/DSH_NPM_TOKEN' },
+        ]) {
+            payloads.push(JSON.stringify(await provider.request(request)));
+        }
+        const joined = payloads.join('\n');
+        eq(joined.includes(SENTINEL), false);
+        eq(joined.includes('npm-OTHER-sentinel-9d31'), false);
+        return true;
+    });
+
+    await itAsync('an unknown key is refused, not answered with the index', async () => {
+        let caught = null;
+        try { await provider.request({ method: 'resources/read', uri: 'key-panel://keys/DSH_NOPE' }); }
+        catch (error) { caught = error; }
+        eq(caught !== null, true);
+        eq(caught.message.includes('no credential named'), true);
+        return true;
+    });
+    await itAsync('a foreign URI is refused', async () => {
+        let caught = null;
+        try { await provider.request({ method: 'resources/read', uri: 'https://example.com/keys' }); }
+        catch (error) { caught = error; }
+        eq(caught !== null, true);
+        eq(caught.message.includes('not a resource of this server'), true);
+        return true;
+    });
+    await itAsync('a nested path is refused rather than guessed', async () => {
+        let caught = null;
+        try { await provider.request({ method: 'resources/read', uri: 'key-panel://keys/DSH_CF_TOKEN/extra' }); }
+        catch (error) { caught = error; }
+        eq(caught !== null, true);
+        return true;
+    });
+    await itAsync('an unsupported method is refused', async () => {
+        let caught = null;
+        try { await provider.request({ method: 'resources/subscribe' }); }
+        catch (error) { caught = error; }
+        eq(caught !== null, true);
+        eq(caught.message.includes('unsupported method'), true);
+        return true;
+    });
+
+    await itAsync('a key added after the provider was built is visible immediately', async () => {
+        store.set('DSH_LATE_ARRIVAL', 'late-value-7', 'added later');
+        const result = await provider.request({ method: 'resources/read', uri: 'key-panel://keys' });
+        const body = JSON.parse(result.contents[0].text);
+        eq(body.keys.some(k => k.name === 'DSH_LATE_ARRIVAL'), true);
+        eq(JSON.stringify(body).includes('late-value-7'), false);
+        return true;
+    });
+
+    await itAsync('the reported access mode tracks the live policy', async () => {
+        store.setPolicy({ accessMode: 'edit', scopePattern: null });
+        const result = await provider.request({ method: 'resources/read', uri: 'key-panel://keys' });
+        eq(JSON.parse(result.contents[0].text).accessMode, 'edit');
+        return true;
+    });
+    it('parseResourceUri separates index / key / refusal', () => {
+        eq(mcpResources.parseResourceUri('key-panel://keys'), undefined);
+        eq(mcpResources.parseResourceUri('key-panel://keys/DSH_X'), 'DSH_X');
+        eq(mcpResources.parseResourceUri('other://keys'), null);
+        eq(mcpResources.parseResourceUri(undefined), null);
+        return true;
+    });
+}
+
+describe('[27] MCP resource registration is optional and self-limiting');
+{
+    const dir = mkdtempSync(join(tmpdir(), 'kp-mcp-reg-'));
+    const store = new KeyStore(keyStorePath(dir));
+    store.set('DSH_A', 'value-a', 'first');
+
+    it('a context with no inject() is a silent no-op', () => {
+        let threw = null;
+        try { mcpResources.registerResources({ ctx: { effect: () => {} }, store }); }
+        catch (error) { threw = error; }
+        eq(threw, null);
+        return true;
+    });
+    it('it asks for mcpResources by name', () => {
+        const asked = [];
+        mcpResources.registerResources({
+            ctx: { inject: (deps) => { asked.push(...deps); }, effect: () => {} },
+            store,
+        });
+        eq(asked, ['mcpResources']);
+        return true;
+    });
+    it('with the service present it registers one provider and logs it', () => {
+        const registrations = [];
+        const lines = [];
+        mcpResources.registerResources({
+            ctx: {
+                inject: (deps, callback) => callback({ mcpResources: { register: (name, provider) => { registrations.push({ name, provider }); return () => {}; } }, effect: () => {} }),
+                effect: () => {},
+            },
+            store,
+            logger: { info: line => lines.push(String(line)), warn: line => lines.push(String(line)) },
+        });
+        eq(registrations.length, 1);
+        eq(registrations[0].name, 'key-panel');
+        eq(lines.some(l => l.includes('published MCP resource server')), true);
+        return true;
+    });
+
+    // The prompt must describe the MCP surface only where it actually exists,
+    // and must state the metadata-only boundary in the same breath.
+    it('the capability hint is registered only after a successful publish', () => {
+        const sections = [];
+        mcpResources.registerResources({
+            ctx: {
+                inject: (deps, callback) => callback({ mcpResources: { register: () => () => {} }, effect: () => {} }),
+                effect: () => {},
+                systemPrompt: { section: definition => sections.push(definition) },
+            },
+            store,
+            logger: { info: () => {}, warn: () => {} },
+        });
+        eq(sections.length, 1);
+        eq(sections[0].name, mcpResources.PROMPT_SECTION);
+        eq(sections[0].order, mcpResources.PROMPT_ORDER);
+        // Must sit after the base key-panel section (7777) and before the
+        // persona suffix (10200).
+        eq(sections[0].order > 7777 && sections[0].order < 10200, true);
+        return true;
+    });
+    it('the capability hint names the server and the two tools', () => {
+        const text = mcpResources.PROMPT_TEXT;
+        eq(text.includes('key-panel'), true);
+        eq(text.includes('list_mcp_resources'), true);
+        eq(text.includes('read_mcp_resource'), true);
+        // It must say the surface is metadata-only, or a model could reasonably
+        // expect to read a value through it.
+        eq(text.includes('永不返回密钥值'), true);
+        return true;
+    });
+    it('a failed publish registers no capability hint', () => {
+        const sections = [];
+        mcpResources.registerResources({
+            ctx: {
+                inject: (deps, callback) => callback({ mcpResources: { register: () => { throw new Error('duplicate'); } }, effect: () => {} }),
+                effect: () => {},
+                systemPrompt: { section: definition => sections.push(definition) },
+            },
+            store,
+            logger: { info: () => {}, warn: () => {} },
+        });
+        eq(sections, []);
+        return true;
+    });
+    it('a context with no systemPrompt still publishes without throwing', () => {
+        let threw = null;
+        try {
+            mcpResources.registerResources({
+                ctx: {
+                    inject: (deps, callback) => callback({ mcpResources: { register: () => () => {} }, effect: () => {} }),
+                    effect: () => {},
+                },
+                store,
+                logger: { info: () => {}, warn: () => {} },
+            });
+        }
+        catch (error) { threw = error; }
+        eq(threw, null);
+        return true;
+    });
+    it('a throwing register is logged, not propagated', () => {
+        const lines = [];
+        let threw = null;
+        try {
+            mcpResources.registerResources({
+                ctx: {
+                    inject: (deps, callback) => callback({ mcpResources: { register: () => { throw new Error('duplicate server name'); } }, effect: () => {} }),
+                    effect: () => {},
+                },
+                store,
+                logger: { info: () => {}, warn: line => lines.push(String(line)) },
+            });
+        }
+        catch (error) { threw = error; }
+        eq(threw, null);
+        eq(lines.some(l => l.includes('could not publish MCP resources')), true);
+        return true;
+    });
+
+    // Guards against re-introducing the failure class that 1.0.2-dev.5 fixed,
+    // in the opposite direction: over-declaring an OPTIONAL service would make
+    // key-panel unloadable on a composition without the MCP resource package.
+    await itAsync('mcpResources is NOT in the plugin inject array', async () => {
+        const host = await import(indexModuleUrl);
+        eq(host.inject.includes('mcpResources'), false);
+        eq(host.inject.includes('systemPrompt'), true);
+        return true;
+    });
+    it('lib/mcp-resources.js never reads a value-bearing projection', () => {
+        const source = readFileSync(join(ROOT, 'lib/mcp-resources.js'), 'utf8');
+        const offenders = source
+            .split('\n')
+            .map((line, index) => ({ line: line.trim(), index: index + 1 }))
+            .filter(({ line }) => !line.startsWith('*') && !line.startsWith('//') && !line.startsWith('/*'))
+            .filter(({ line }) => /[.]\s*(values|list)\s*\(/.test(line));
+        eq(offenders.map(o => o.index + ': ' + o.line), []);
+        return true;
+    });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
+
