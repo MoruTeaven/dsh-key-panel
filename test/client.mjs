@@ -715,6 +715,10 @@ describe('[13] filling a key in from the account row');
         if (typeof node.type === 'string') out.seen.add(node.type);
         const props = node.props || {};
         if (typeof props.className === 'string') out.classes.push(props.className);
+        // The per-slot state is an attribute, not a word: a filled slot draws a
+        // dot and only an empty one spends text on saying so. Reading the flag is
+        // what keeps this assertion about state rather than about copy.
+        if (typeof props['data-filled'] === 'string') out.slotFlags.push(props['data-filled']);
         if (typeof props.value === 'string') out.values.push(props.value);
         if (typeof props.onClick === 'function') out.clicks.push(props.onClick);
         for (const key of Object.keys(props)) {
@@ -740,7 +744,7 @@ describe('[13] filling a key in from the account row');
             return [store[i], value => { store[i] = typeof value === 'function' ? value(store[i]) : value; }];
         };
         if (slotDraftSeed !== undefined) store[5] = slotDraftSeed;
-        const out = { seen: new Set(), texts: [], classes: [], values: [], clicks: [], modals: [] };
+        const out = { seen: new Set(), texts: [], classes: [], values: [], clicks: [], modals: [], slotFlags: [] };
         harvest(PlatformGroup({
             t: key => key, busy: false,
             onAddPlatform: () => {}, onAddAccount: () => {}, onRenamePlatform: () => {}, onRenameAccount: () => {},
@@ -754,13 +758,17 @@ describe('[13] filling a key in from the account row');
     const groups = { platforms: [{ identifier: 'CF', label: 'Cloudflare' }], accounts: [{ platform: 'CF', identifier: 'WORK', label: 'Work' }] };
 
     // ── The row tells you whether a slot is actually filled ────────────────
+    // The state is carried by the per-slot data-filled flag: a filled slot draws
+    // a dot, and only an EMPTY one spends text on saying so. Asserting the flag
+    // keeps this about state rather than about the current wording.
     const nothing = render({ groups, keys: [] });
     it('an empty slot is labelled as such', () => eq(nothing.out.texts.includes('slotEmpty'), true));
     it('an empty slot is not labelled as filled', () => eq(nothing.out.texts.includes('slotFilled'), false));
+    it('and both slots report themselves unfilled', () => eq(nothing.out.slotFlags, ['false', 'false']));
 
     const half = render({ groups, keys: [{ name: 'DSH_CF_WORK_KEY' }] });
-    it('a slot that holds a value is labelled as filled', () => eq(half.out.texts.includes('slotFilled'), true));
-    it('the other slot still reads as empty', () => eq(half.out.texts.includes('slotEmpty'), true));
+    it('a slot that holds a value reports itself filled', () => eq(half.out.slotFlags, ['false', 'true']));
+    it('and only the empty one says so in words', () => eq(half.out.texts.filter(text => text === 'slotEmpty').length, 1));
 
     // ── The entry point lives on the account row ──────────────────────────
     it('the account row offers the fill entry point', () => eq(nothing.out.texts.includes('fillKey'), true));
@@ -856,7 +864,7 @@ describe('[13] filling a key in from the account row');
 
     // ── The dictionaries carry the new strings ─────────────────────────────
     it('the new popup strings are defined', () => {
-        for (const key of ['fillKey:', 'fillKeyTitle:', 'fillKeyLead:', 'slotId:', 'slotKey:', 'slotEmpty:', 'slotFilled:', 'slotKeepHint:', 'fillSave:', 'fillNone:']) {
+        for (const key of ['fillKey:', 'fillKeyTitle:', 'fillKeyLead:', 'slotId:', 'slotKey:', 'slotEmpty:', 'slotKeepHint:', 'fillSave:', 'fillNone:']) {
             if (!source.includes(key)) throw new Error('missing dictionary key ' + key);
         }
         return true;
@@ -958,6 +966,90 @@ describe('[12] every primitive the bundle destructures actually exists');
     it('no unknown name is destructured from the primitives', () => {
         const unknown = destructured.filter(n => !KNOWN_PRIMITIVES.has(n));
         eq(unknown, []);
+        return true;
+    });
+}
+
+// ── Props passed to a primitive are the ones it actually accepts ───────────
+describe('[24] primitive props match the real component signatures');
+// The sibling of group [12]. That group catches a NAME the host does not export;
+// this one catches a PROP the host does not read — the failure mode that is even
+// quieter, because the component still renders. \`StateDot\` was passed
+// \`tone: "success"\` while its real signature is
+// \`StateDot({ state, size, className })\` and its states are
+// done/warning/ongoing/error/idle: React ignores an unknown prop, so the slot
+// simply drew the DEFAULT dot, with every test green and nothing on screen
+// looking broken. Only the accepted prop names and the enum values are pinned —
+// a real typechecker would be better, and this is the cheap stand-in.
+{
+    // Signatures read from @deepseek-ai/dsh-client-ui-primitives 0.2.0-rc.2.
+    const PROP_SIGNATURES = {
+        StateDot: { props: ['state', 'size', 'className'], enums: { state: ['done', 'warning', 'ongoing', 'error', 'idle'] } },
+        Button: { props: ['children', 'size', 'variant', 'icon', 'title', 'disabled', 'onClick', 'key', 'className', 'type', 'loading', 'danger', 'block'] },
+        Input: { props: ['value', 'placeholder', 'disabled', 'onChange', 'type', 'className', 'size', 'key', 'autoFocus', 'onKeyDown', 'onBlur', 'onFocus', 'id', 'name'] },
+        Modal: { props: ['open', 'onClose', 'title', 'closeLabel', 'description', 'footer', 'children', 'size', 'className', 'key'] },
+        Toast: { props: ['text', 'icon', 'onDone', 'key', 'tone', 'duration'] },
+        Tag: { props: ['children', 'key', 'className', 'tone', 'size'] },
+    };
+
+    // Pull every \`jsx(Primitive, { ... })\` call site out of the bundle, with the
+    // prop keys written at its top level. A nested object literal is skipped: its
+    // braces close before the outer one, so only depth-1 keys are collected.
+    const callSites = [];
+    for (const name of Object.keys(PROP_SIGNATURES)) {
+        const re = new RegExp('jsxs?\\(' + name + ', \\{', 'g');
+        let match;
+        while ((match = re.exec(source)) !== null) {
+            const open = source.indexOf('{', match.index + match[0].length - 1);
+            let depth = 0, i = open;
+            for (; i < source.length; i++) {
+                const ch = source[i];
+                if (ch === '{') depth += 1;
+                else if (ch === '}') { depth -= 1; if (depth === 0) break; }
+            }
+            const body = source.slice(open + 1, i);
+            const keys = [];
+            let inner = 0;
+            for (let j = 0; j < body.length; j++) {
+                const ch = body[j];
+                if (ch === '{' || ch === '(' || ch === '[') inner += 1;
+                else if (ch === '}' || ch === ')' || ch === ']') inner -= 1;
+                else if (inner === 0) {
+                    const rest = body.slice(j);
+                    const keyMatch = rest.match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s*:/);
+                    if (keyMatch && (j === 0 || /[,\s]/.test(body[j - 1]))) keys.push(keyMatch[1]);
+                }
+            }
+            callSites.push({ name, keys, body });
+        }
+    }
+
+    it('every primitive call site was found', () => callSites.length >= 6);
+
+    it('no primitive is passed a prop it does not declare', () => {
+        const offenders = [];
+        for (const site of callSites) {
+            const allowed = PROP_SIGNATURES[site.name].props;
+            for (const key of site.keys) {
+                if (!allowed.includes(key)) offenders.push(site.name + '.' + key);
+            }
+        }
+        eq(offenders, []);
+        return true;
+    });
+
+    it('an enum-valued prop only ever gets a value the component accepts', () => {
+        const offenders = [];
+        for (const site of callSites) {
+            const enums = PROP_SIGNATURES[site.name].enums ?? {};
+            for (const [prop, allowed] of Object.entries(enums)) {
+                const value = site.body.match(new RegExp(prop + ': "([^"]+)"'));
+                if (value !== null && !allowed.includes(value[1])) {
+                    offenders.push(site.name + '.' + prop + ' = ' + value[1]);
+                }
+            }
+        }
+        eq(offenders, []);
         return true;
     });
 }

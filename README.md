@@ -107,7 +107,15 @@ derived names are shown in the popup but never typed, which is the point: making
 you carry a name the plugin computed up to the flat **Add key** card, once per
 field, was transcription.
 
-Each slot shows whether it holds a value, and a slot can be left blank for now.
+An account row states everything one account has: its display name and identifier
+above, its two variable names below, each with its own state — **a filled slot is a
+small dot, and only an empty one spends the word "Not set"**. The wording is spent
+where a click is still needed, so a scan down the card shows what is missing. The
+platform row above keeps only the display name, the account count and a few icon
+buttons; the variable names are not repeated there, because they belong to the
+account level.
+
+Any slot can be left blank for now.
 **Add key** is still there for ungrouped keys, which have no account to be filled
 in from.
 
