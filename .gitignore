@@ -33,3 +33,10 @@ coverage/
 # Local backups
 *.bak
 *.orig
+
+# One-off local maintenance scripts. These point at machine-specific paths
+# (this operator's profile directory) and are not part of the published plugin.
+# The repo's own `files` list already excludes them; this keeps `git status`
+# honest about what is actually pending.
+update-profile-keypanel.mjs
+upgrade-profile-pin.ps1
