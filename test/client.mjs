@@ -385,6 +385,51 @@ it('the CSS guard is idempotent by tag id', () => {
     return true;
 });
 
+// ── Every design token the bundle reads actually exists in the host ─────────
+// The same silent-failure shape as group [12], one layer down. An undefined
+// \`var(--dsw-alias-...)\` is not an error anywhere: CSS drops the declaration,
+// the element falls back to whatever it inherits, and the result looks like a
+// styling choice rather than a bug. It is how \`--dsw-alias-state-info-tertiary\`
+// shipped: the "current mode" badge and the declared-intent tag were both built
+// on a token pair the host never defines, so both rendered as plain unstyled
+// text with every test green.
+//
+// The list below is the complete set this bundle is allowed to read, verified
+// against the host's own declaration sites:
+//   @deepseek-ai/dsh-client-ui-theme/lib/client.js  (design-platform.css)
+//   lib/native-ui/assets/compatibility-chrome-*.css
+// A NEW token here is a deliberate act: add it only after confirming the host
+// declares it. That check is the whole point — do not paste a name in.
+{
+    const ALLOWED_TOKENS = new Set([
+        '--dsw-alias-bg-layer-1', '--dsw-alias-bg-layer-2',
+        '--dsw-alias-border-l1', '--dsw-alias-border-l2', '--dsw-alias-border-l3',
+        '--dsw-alias-brand-primary',
+        '--dsw-alias-interactive-bg-hover',
+        '--dsw-alias-label-primary', '--dsw-alias-label-secondary', '--dsw-alias-label-tertiary',
+        '--dsw-alias-markdown-code-block',
+        '--dsw-alias-state-business-primary', '--dsw-alias-state-business-tertiary',
+        '--dsw-alias-state-error-primary',
+        '--dsw-alias-state-warn-label', '--dsw-alias-state-warn-tertiary',
+        '--dsw-font-markdown-code-font-family',
+    ]);
+
+    it('every design token the bundle reads is on the verified list', () => {
+        const used = [...new Set([...source.matchAll(/(--dsw-[a-z0-9-]+)/g)].map(m => m[1]))].sort();
+        const unknown = used.filter(token => !ALLOWED_TOKENS.has(token));
+        eq(unknown, []);
+        return true;
+    });
+
+    it('the token list has no entry the bundle stopped using', () => {
+        // A stale entry would quietly re-authorise a token nobody re-verified.
+        const used = new Set([...source.matchAll(/(--dsw-[a-z0-9-]+)/g)].map(m => m[1]));
+        const unused = [...ALLOWED_TOKENS].filter(token => !used.has(token)).sort();
+        eq(unused, []);
+        return true;
+    });
+}
+
 // ── The name must agree across all three files, or the plugin cannot start ──
 describe('[9] package name consistency');
 {
