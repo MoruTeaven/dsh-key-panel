@@ -52,6 +52,14 @@ Assistant needs to deploy a Worker
 - **Values never reach the model.** No tool returns a key value, in any mode.
 - **Idempotent, hot-reload safe.** The panel re-reads policy on every call.
 
+## Screenshots
+
+Settings → Keys, as it looks in use:
+
+![The Keys panel: the stored keys, each with its platform and account and a provenance badge, above the assistant-access and platform cards](https://raw.githubusercontent.com/MoruTeaven/dsh-key-panel/main/docs/images/keys-overview.png)
+
+![The assistant-access picker with its three modes, and one platform holding an account whose two slots are both filled](https://raw.githubusercontent.com/MoruTeaven/dsh-key-panel/main/docs/images/access-and-platforms.png)
+
 ## Install
 
 ```

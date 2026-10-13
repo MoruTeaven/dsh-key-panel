@@ -41,6 +41,14 @@ npm では `@moruteaven/dsh-key-panel` · [English](https://github.com/MoruTeave
 - **値はモデルに渡りません**。どのモードでも、値を返すツールは存在しません。
 - **冪等・ホットリロード対応**。ポリシーは毎回読み直されます。
 
+## スクリーンショット
+
+設定 → キー の実際の表示：
+
+![キーパネル：保存済みキーの一覧。各行にプラットフォーム／アカウントと作成元バッジ、その上にアシスタント権限とプラットフォームのカード](https://raw.githubusercontent.com/MoruTeaven/dsh-key-panel/main/docs/images/keys-overview.png)
+
+![アシスタント権限の 3 モードと、1 つのプラットフォーム下のアカウント——2 つのスロットはどちらも入力済み](https://raw.githubusercontent.com/MoruTeaven/dsh-key-panel/main/docs/images/access-and-platforms.png)
+
 ## インストール
 
 ```

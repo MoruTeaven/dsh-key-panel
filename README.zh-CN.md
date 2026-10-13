@@ -32,6 +32,14 @@ npm 上的 `@moruteaven/dsh-key-panel` · [English](https://github.com/MoruTeave
 - **值永不进模型**。任何模式下，没有任何工具会把密钥值返回给模型。
 - **幂等、可热重载**。面板每次调用都重新读取当前权限。
 
+## 界面示例
+
+设置 → 密钥 的实际样子：
+
+![密钥面板：已存密钥的列表，每条带平台/账号归属与来源徽标，上方是助手权限与平台账号卡片](https://raw.githubusercontent.com/MoruTeaven/dsh-key-panel/main/docs/images/keys-overview.png)
+
+![助手权限的三档选择，以及一个平台下的账号——两个槽位都已填写](https://raw.githubusercontent.com/MoruTeaven/dsh-key-panel/main/docs/images/access-and-platforms.png)
+
 ## 安装
 
 ```
