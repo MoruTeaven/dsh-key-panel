@@ -302,8 +302,9 @@ The short version:
 - The assistant can never read a key value into its transcript, in any mode.
 - The assistant can never change the access mode or the scope — those are
   operator-only.
-- In `readonly`, the model-facing tools do not exist rather than refusing —
-  the capability is absent, not argued about.
+- In `readonly`, the write tools do not exist rather than refusing —
+  the capability is absent, not argued about. (`key_panel_intent` is registered
+  in every mode; declaring a purpose changes nothing.)
 - `readonly` limits **what can change**, not **what can be seen**: a key has to
   be in the shell environment to work, so the assistant can list the names.
   Names and purposes are non-secret by design; only values are.
