@@ -189,7 +189,7 @@ timestamps only. No value is ever written to it.**
 
 | Mode | Assistant can | Assistant cannot |
 | --- | --- | --- |
-| `readonly` *(default)* | use keys | change anything — **no model-facing tool is registered at all** |
+| `readonly` *(default)* | use keys | change anything — **no write tool is registered at all** |
 | `write` | add keys; replace keys it created | delete anything; edit your keys |
 | `edit` | add, change, delete | — (delete still needs confirmation) |
 
@@ -302,15 +302,19 @@ The short version:
 - The assistant can never read a key value into its transcript, in any mode.
 - The assistant can never change the access mode or the scope — those are
   operator-only.
-- In `readonly`, the model-facing tools do not exist rather than refusing —
-  the capability is absent, not argued about.
+- In `readonly`, the write tools do not exist rather than refusing —
+  the capability is absent, not argued about. (`key_panel_intent` is registered
+  in every mode; declaring a purpose changes nothing.)
+- `readonly` limits **what can change**, not **what can be seen**: a key has to
+  be in the shell environment to work, so the assistant can list the names.
+  Names and purposes are non-secret by design; only values are.
 
 ## Development
 
 ```bash
-npm test            # both suites — 480 assertions
+npm test            # both suites — 486 assertions
 npm run test:host   # host half: policy, store, tools, gateway, MCP resources (335)
-npm run test:client # client bundle: contract, slots, RPC, dictionaries (145)
+npm run test:client # client bundle: contract, slots, RPC, dictionaries (151)
 ```
 
 The client suite loads `lib/client.js` the way the real frontend does — a fake

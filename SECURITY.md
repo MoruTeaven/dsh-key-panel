@@ -63,6 +63,16 @@ the next tool call **without a restart**. Default:
 | `write` | create a key; replace a key it created | delete anything; modify operator-created keys |
 | `edit` | create, replace, delete | — (deletion still needs a second confirmation) |
 
+**What `readonly` hides, and what it cannot hide.** It hides **values** and, on
+the tool surface, **descriptions** — never **names**. A key has to be present in
+the shell environment to be usable, and the model is the one running the shell,
+so `env | grep DSH_` lists every name in every mode, `readonly` included.
+`readonly` removes `key_panel_list`, which is what keeps descriptions from
+arriving through a tool call; when the optional MCP catalogue is loaded, that
+catalogue still publishes each name's description and grouping in all modes
+(see below). Names and descriptions are non-secret by design; only **values**
+are secret.
+
 ### Why `readonly` removes the capability instead of refusing it
 
 In `readonly` mode no `key_panel_set` / `key_panel_delete` tool is registered at

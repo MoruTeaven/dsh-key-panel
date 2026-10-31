@@ -24,9 +24,11 @@ passes; see below.
 - `lib/policy.js`, `lib/store.js` — import `node:*` and nothing else. They are the
   pure core, which is what keeps them testable without the app running.
 - `lib/tools.js` — the model's face. Every tool is registered inside the **mode
-  gate** (`readonly` registers none: the capability is absent, not refused), and
-  the policy is re-read at call time via `livePolicy()`, never from a captured
-  copy.
+  gate** (`readonly` registers no mutating tool: the capability is absent, not
+  refused), and the policy is re-read at call time via `livePolicy()`, never from
+  a captured copy. The gate hides what the model can **change** and what it can
+  read through a **tool call** — never key names, which the shell environment
+  already exposes in every mode.
 - `lib/mcp-resources.js` — the read-only discovery surface. Built entirely on
   `store.metadata()`, which has no value field: that is what makes "no value
   crosses this boundary" structural instead of a promise. Reached through
