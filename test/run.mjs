@@ -1596,6 +1596,127 @@ describe('[27] MCP resource registration is optional and self-limiting');
     });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+describe('[28] the prompt carries the current key inventory');
+{
+    const inventory = await import(pathToFileURL(join(ROOT, 'lib/prompt-inventory.js')).href);
+
+    it('an empty store renders nothing', () => eq(inventory.renderKeyInventory([]), ''));
+
+    it('undefined input renders nothing', () => eq(inventory.renderKeyInventory(undefined), ''));
+
+    it('each key is listed with its $name and description', () => {
+        const text = inventory.renderKeyInventory([
+            { name: 'DSH_NPM_TOKEN', description: 'npm 发布 token' },
+            { name: 'DSH_CF_TOKEN', description: 'Cloudflare API token' },
+        ]);
+        eq(text.includes('$DSH_NPM_TOKEN — npm 发布 token'), true);
+        eq(text.includes('$DSH_CF_TOKEN — Cloudflare API token'), true);
+        return true;
+    });
+
+    it('the render is sorted by name regardless of input order', () => {
+        const text = inventory.renderKeyInventory([
+            { name: 'DSH_B', description: 'b' },
+            { name: 'DSH_A', description: 'a' },
+        ]);
+        eq(text.indexOf('$DSH_A') < text.indexOf('$DSH_B'), true);
+        return true;
+    });
+
+    it('the head line states the count', () => {
+        const text = inventory.renderKeyInventory([{ name: 'DSH_ONE', description: 'x' }]);
+        eq(text.includes('1 个密钥'), true);
+        return true;
+    });
+
+    it('a value field on the record can never reach the text', () => {
+        // The whitelist is the guard: even a caller that hands the renderer a
+        // value-carrying record must not leak it into the prompt.
+        const text = inventory.renderKeyInventory([
+            { name: 'DSH_X', description: 'd', value: 'SUPER-SECRET-7' },
+        ]);
+        eq(text.includes('SUPER-SECRET-7'), false);
+        return true;
+    });
+
+    it('a long description is clamped', () => {
+        const text = inventory.renderKeyInventory([
+            { name: 'DSH_X', description: 'x'.repeat(200) },
+        ]);
+        eq(text.length < 200, true);
+        return true;
+    });
+
+    it('beyond the limit the render collapses to a count line', () => {
+        const many = Array.from({ length: 30 }, (_, i) => ({ name: `DSH_K${i < 10 ? '0' : ''}${i}`, description: 'k' }));
+        const text = inventory.renderKeyInventory(many, 24);
+        eq(text.includes('$DSH_K23'), true);
+        eq(text.includes('$DSH_K24'), false);
+        eq(text.includes('其余 6 个'), true);
+        return true;
+    });
+
+    // ── Integration through the real apply(): the section the model will see ─
+
+    const host = await import(indexModuleUrl);
+    const dir = mkdtempSync(join(tmpdir(), 'kp-inventory-'));
+    const sections = [];
+    let gateway = null;
+    const ctx = {
+        logger: { info: () => {}, warn: () => {} },
+        effect: () => {},
+        get: n => (n === 'shellEnv' ? { register: () => () => {} } : undefined),
+        shellEnv: { register: () => () => {} },
+        tools: { register() { return () => {}; } },
+        systemPrompt: { section: definition => sections.push(definition) },
+        plugin: (ctor, deps) => { gateway = new ctor({ reflect: { provide() {} } }, deps); },
+    };
+    host.apply(ctx, { dshHome: dir });
+
+    it('apply() registers the inventory section beside the static one', () => {
+        const names = sections.map(s => s.name);
+        eq(names.includes('key-panel'), true);
+        eq(names.includes(inventory.INVENTORY_SECTION), true);
+        return true;
+    });
+
+    it('the inventory section sits at order 7779 and skips interpolation', () => {
+        const section = sections.find(s => s.name === inventory.INVENTORY_SECTION);
+        eq(section.order, 7779);
+        eq(section.interpolate, false);
+        return true;
+    });
+
+    it('an empty store renders an empty section text', () => {
+        const section = sections.find(s => s.name === inventory.INVENTORY_SECTION);
+        eq(section.text(), '');
+        return true;
+    });
+
+    it('a key added through the gateway appears in the very next render', () => {
+        gateway.set('DSH_NPM_TOKEN', 'op-value-7', 'npm 发布 token');
+        const section = sections.find(s => s.name === inventory.INVENTORY_SECTION);
+        const text = section.text();
+        eq(text.includes('$DSH_NPM_TOKEN'), true);
+        eq(text.includes('npm 发布 token'), true);
+        return true;
+    });
+
+    it('and the rendered section still never quotes the value', () => {
+        const section = sections.find(s => s.name === inventory.INVENTORY_SECTION);
+        eq(section.text().includes('op-value-7'), false);
+        return true;
+    });
+
+    it('the static section points the model at the inventory list', () => {
+        const base = sections.find(s => s.name === 'key-panel');
+        eq(typeof base.text, 'string');
+        eq(base.text.includes('清单段'), true);
+        return true;
+    });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
 
